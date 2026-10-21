@@ -47,8 +47,40 @@ CHINESE_DIGITS = {
     "九": 9,
     "十": 10,
 }
-FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９", "0123456789")
+FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９／－", "0123456789/-")
 NUMBER_TOKEN = r"[0-9零〇一二兩三四五六七八九十廿]+"
+
+
+def normalizeQuestionText(question: str) -> str:
+    text = question.translate(FULLWIDTH_DIGITS)
+
+    def separateNumbers(match: re.Match) -> str:
+        # 機號與年份之間的空白是語意邊界，不能當作排版空白刪掉。
+        if (
+            match.start() > 0
+            and match.end() < len(text)
+            and text[match.start() - 1] in "0123456789一二兩三四五六七八九十"
+            and text[match.end()].isdigit()
+        ):
+            return " "
+        return ""
+
+    return re.sub(r"\s+", separateNumbers, text)
+
+
+def peakOutputState(question: str) -> str | None:
+    compact = re.sub(r"\s+", "", question.translate(FULLWIDTH_DIGITS))
+    if any(word in compact for word in ("沒有出力", "沒出力", "無出力", "沒有發電", "沒發電")):
+        return "zero"
+    if any(word in compact for word in ("非零", "有出力", "有發電", "有值")) or re.search(
+        r"(?:出力|輸出|功率)(?:不是|不等於|不為|大於|>|!=|≠)(?:零|0)(?!\d|\.)", compact
+    ):
+        return "positive"
+    if any(word in compact for word in ("零出力", "零輸出", "零值", "等於零")) or re.search(
+        r"(?:出力|輸出|功率)(?:為|是|等於|=)(?:零|0)(?!\d|\.)", compact
+    ):
+        return "zero"
+    return None
 
 
 def _number(value: str) -> int:

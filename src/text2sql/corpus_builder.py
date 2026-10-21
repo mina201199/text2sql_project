@@ -214,7 +214,8 @@ def promote_batch(
 
     proposed = {**corpus, "examples": [*corpus["examples"], *accepted]}
     proposed_checksum = corpus_checksum(proposed)
-    proposed["version"] = f"corpus-{proposed_checksum[:12]}"
+    # 分隔雜湊中的數字，避免版本識別碼被當成帳號或電話遮蔽。
+    proposed["version"] = f"corpus-{proposed_checksum[:6]}x{proposed_checksum[6:12]}"
     passed, metrics = regression_gate(proposed)
     if not passed:
         return PromotionResult(

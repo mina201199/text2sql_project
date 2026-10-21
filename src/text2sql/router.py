@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from align.naming import chinese_number
 from text2sql.aliases import resolve_peak_column, resolve_peak_columns, resolve_plant
-from text2sql.entities import FULLWIDTH_DIGITS, NUMBER_TOKEN, Entities
+from text2sql.entities import NUMBER_TOKEN, Entities, normalizeQuestionText, peakOutputState
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class RoutedQuery:
 
 
 def classify_intent(question: str) -> str:
-    question = re.sub(r"\s+", "", question.translate(FULLWIDTH_DIGITS))
+    question = normalizeQuestionText(question)
     if "成本" in question:
         return "generation_cost"
     system_words = ("負載", "備轉", "供電能力", "工業用電", "民生用電", "系統指標")
@@ -46,7 +46,11 @@ def classify_intent(question: str) -> str:
         return "other"
 
     plant_words = ("機組", "設備", "各機", "所屬", "機組名稱", "機組主檔")
-    if ("電廠" in question or "廠" in question) and any(word in question for word in plant_words):
+    if (
+        ("電廠" in question or "廠" in question)
+        and any(word in question for word in plant_words)
+        and not any(word in question for word in ("出力", "輸出", "功率", "尖峰"))
+    ):
         return "plant_units"
 
     ranking_shape = (
@@ -64,12 +68,13 @@ def classify_intent(question: str) -> str:
                 "由高到低",
                 "由低到高",
                 "由小到大",
+                "由大到小",
             )
         )
         or bool(re.search(rf"前{NUMBER_TOKEN}(?:名|欄|個|台)(?!月)", question))
         or bool(
             re.search(
-                r"(?:最大|最小|最高|最低)(?:的)?[0-9一二三四五六七八九十]+(?:名|欄|個|台)",
+                rf"(?:最大|最小|最高|最低)(?:的)?{NUMBER_TOKEN}(?:名|欄|個|台)",
                 question,
             )
         )
@@ -104,16 +109,24 @@ def classify_intent(question: str) -> str:
     if ranking_shape:
         return "daily_ranking"
 
-    day_count_words = ("幾天", "日數", "天數", "日期數", "的天", "的日期")
-    zero_state = (
-        "零出力" in question
-        and "非零出力" not in question
-        or "零輸出" in question
-        and "非零輸出" not in question
-    ) or any(word in question for word in ("零值", "沒有出力", "沒發電", "等於零"))
-    if zero_state or (
+    day_count_words = (
+        "幾天",
+        "多少天",
+        "幾日",
+        "日數",
+        "天數",
+        "日期數",
+        "的天",
+        "的日期",
+        "哪幾天",
+        "哪些天",
+        "哪些日子",
+        "清單",
+    )
+    outputState = peakOutputState(question)
+    if outputState == "zero" or (
         any(word in question for word in day_count_words)
-        and any(word in question for word in ("有出力", "有發電", "有值", "非零", "停機"))
+        and (outputState is not None or "停機" in question)
     ):
         return "zero_days"
 
@@ -228,6 +241,7 @@ def route(
     plants: set[str] | None = None,
     data_range: tuple[str, str] | None = None,
 ) -> RoutedQuery:
+    question = normalizeQuestionText(question)
     intent = classify_intent(question)
     bounded_range = _bounded_range(entities, data_range)
 
@@ -298,7 +312,7 @@ def route(
             function, alias = ("MIN", "最小值") if find_minimum else ("MAX", "最大值")
             direction = "ASC" if find_minimum else "DESC"
             clause, range_params = _range_clause(bounded_range)
-            nonzero = ' AND "尖峰出力_萬瓩" > 0' if "非零" in question else ""
+            nonzero = ' AND "尖峰出力_萬瓩" > 0' if peakOutputState(question) == "positive" else ""
             params = (resolution.value, *range_params)
             if any(word in question for word in ("日期", "哪天", "發生日", "全期")):
                 return RoutedQuery(
@@ -324,8 +338,10 @@ def route(
         limit = entities.top_n or (64 if "所有" in question else 20)
         filters = ['"日期" = ?']
         params: list[object] = [entities.explicit_date]
-        if "非零" in question:
+        if peakOutputState(question) == "positive":
             filters.append('"尖峰出力_萬瓩" > 0')
+        elif peakOutputState(question) == "zero":
+            filters.append('"尖峰出力_萬瓩" = 0')
         if entities.fuel:
             filters.append('"類別" = ?')
             params.append(
@@ -446,12 +462,12 @@ def route(
         resolution = resolve_peak_column(question, peak_columns)
         if resolution.value:
             clause, range_params = _range_clause(bounded_range)
-            positive = not any(word in question for word in ("沒有出力", "沒有發電")) and any(
-                word in question for word in ("有出力", "有發電", "有值", "非零")
-            )
+            positive = peakOutputState(question) == "positive"
             operator = ">" if positive else "="
             params = (resolution.value, *range_params)
-            if "清單" in question or ("日期" in question and "日期數" not in question):
+            if any(word in question for word in ("清單", "哪幾天", "哪些天", "哪些日子")) or (
+                "日期" in question and "日期數" not in question
+            ):
                 return RoutedQuery(
                     intent,
                     'SELECT "日期" FROM v_peak WHERE "機組欄位" = ?'

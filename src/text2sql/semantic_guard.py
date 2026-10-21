@@ -12,8 +12,8 @@ from typing import Any, Protocol
 from sqlglot import exp, parse_one
 from sqlglot.errors import ParseError
 
-from text2sql.aliases import resolve_peak_column
-from text2sql.entities import Entities
+from text2sql.aliases import numberedUnitNames, resolve_peak_column
+from text2sql.entities import Entities, normalizeQuestionText
 from text2sql.llm import GeneratedQuery
 
 
@@ -105,7 +105,7 @@ class SemanticGuard:
         return bool(simplified and simplified in question)
 
     def check_question(self, question: str, entities: Entities) -> SemanticDecision:
-        compact = re.sub(r"\s+", "", question)
+        compact = normalizeQuestionText(question)
 
         cost_types = (
             "火力",
@@ -254,6 +254,23 @@ class SemanticGuard:
                 "機組名稱可對應多個資料欄位，不會自行猜測。",
                 "請說明要查具名燃煤機組，還是複循環彙總欄。",
                 evidence={"candidates": list(resolution.candidates)},
+            )
+
+        numberedTargets = numberedUnitNames(compact)
+        if (
+            numberedTargets
+            and not resolution.value
+            and any(word in compact for word in ("出力", "輸出", "功率", "尖峰"))
+        ):
+            aggregateOnly = any(target.startswith(("大潭#", "通霄#")) for target in numberedTargets)
+            return self._decision(
+                "clarify",
+                "NO_UNIT_DETAIL" if aggregateOnly else "UNKNOWN_UNIT_NAME",
+                "目前僅有該電廠的彙總出力，無法拆成指定單機。"
+                if aggregateOnly
+                else "目前尖峰出力資料沒有這個機組編號。",
+                "請明確指定電廠彙總出力。" if aggregateOnly else "請確認電廠名稱與機組編號。",
+                evidence={"requested_units": list(numberedTargets)},
             )
 
         if (

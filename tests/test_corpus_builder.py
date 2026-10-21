@@ -66,6 +66,27 @@ def test_deidentify_removes_email_token_and_long_account_number() -> None:
     assert deidentify(value) == "[EMAIL] [TOKEN] [ACCOUNT]"
 
 
+@pytest.mark.parametrize("checksumPrefix", ["123456789012", "0912345678ab", "0212345678ab"])
+def test_generated_version_survives_redaction(tmp_path, monkeypatch, checksumPrefix):
+    corpusPath = tmp_path / "corpus.json"
+    _write_corpus(corpusPath)
+    monkeypatch.setattr(corpus_builder, "corpus_checksum", lambda _: checksumPrefix + "a" * 52)
+    result = promote_batch(
+        [_candidate()],
+        corpus_path=corpusPath,
+        index_path=tmp_path / "index.json",
+        versions_dir=tmp_path / "versions",
+        benchmark_question_set=set(),
+        sql_validator=_pass,
+        semantic_validator=_pass,
+        result_validator=_pass,
+        regression_gate=_regression,
+    )
+    assert result.promoted
+    assert result.version == deidentify(result.version)
+    assert load_corpus(corpusPath)["version"] == result.version
+
+
 def test_deidentify_removes_taiwan_identity_phone_and_labeled_name() -> None:
     value = "請替王小明（0912-345-678，身分證 A123456789）查詢；姓名：陳美玲"
 

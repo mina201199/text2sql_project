@@ -12,12 +12,90 @@ from serving.corpus_learning import CorpusLearningService
 from text2sql.corpus import corpus_checksum, load_corpus
 from text2sql.llm import FakeLLM
 from text2sql.pipeline import PipelineResponse, Text2SQLPipeline
+from text2sql.retriever import RETRIEVER_VERSION
 from text2sql.sql_guard import SqlGuard
 
 SQL = 'SELECT "日期" FROM v_system WHERE "日期" = ? LIMIT 1'
 PARAMS = ("2026-07-09",)
 COLUMNS = ("日期",)
 ROWS = (("2026-07-09",),)
+
+
+def _legacyRetrievalRejection(service, *, reason="retrieval_regression", version=None):
+    document = json.loads(service.candidates_path.read_text(encoding="utf-8"))
+    entry = document["entries"][0]
+    entry["status"] = "rejected"
+    entry["reason"] = reason
+    entry["validation"]["retrieval_regression"] = {
+        "passed": False,
+        "metrics": {"baseline_retrieval_intent_accuracy": 1.0, "retrieval_intent_accuracy": 0.0},
+    }
+    if version:
+        entry["validation"]["retrieval_regression"]["retriever_version"] = version
+    service.candidates_path.write_text(json.dumps(document), encoding="utf-8")
+    return entry
+
+
+def test_legacy_retrieval_rejection_is_revalidated_once_without_publication(tmp_path):
+    service, pipeline, _canonical = _service(tmp_path)
+    original = _submit(service)
+    legacy = _legacyRetrievalRejection(service)
+    corpusBefore = service.corpus_path.read_bytes()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(lambda _: _submit(service), range(4)))
+    result = results[0]
+    assert sum(bool(item.get("duplicate")) for item in results) == 3
+
+    assert result["id"] == original["id"]
+    assert result["created_at"] == original["created_at"]
+    assert result["status"] == "pending_review"
+    assert result["approved_by"] == ""
+    assert all(check["passed"] for check in result["validation"].values())
+    assert result["validation"]["retrieval_regression"]["retriever_version"] == RETRIEVER_VERSION
+    assert service.corpus_path.read_bytes() == corpusBefore
+    assert len(pipeline.corpus["examples"]) == 1
+    duplicate = _submit(service)
+    assert duplicate["duplicate"] is True
+    assert len(service.list_entries()) == 1
+    events = [e for e in service.list_events() if e["event"] == "candidate_revalidated"]
+    assert len(events) == 1
+    assert events[0]["previous_validation"] == legacy["validation"]
+
+
+@pytest.mark.parametrize(
+    "reason", ["manual_rejection", "sql_guard:forbidden", "retrieval_regression"]
+)
+def test_current_retrieval_or_nonretrieval_rejections_are_not_reopened(tmp_path, reason):
+    service, _pipeline_instance, _canonical = _service(tmp_path)
+    _submit(service)
+    _legacyRetrievalRejection(service, reason=reason, version=RETRIEVER_VERSION)
+    result = _submit(service)
+    assert result["status"] == "rejected"
+    assert result["reason"] == reason
+    assert result["duplicate"] is True
+    assert not any(e["event"] == "candidate_revalidated" for e in service.list_events())
+
+
+def test_legacy_revalidation_still_checks_result_replay(tmp_path):
+    service, _pipeline_instance, _canonical = _service(tmp_path)
+    _submit(service, rows=(("2020-01-01",),))
+    _legacyRetrievalRejection(service)
+    result = _submit(service)
+    assert result["status"] == "rejected"
+    assert result["reason"] == "result_replay:mismatch"
+
+
+def test_legacy_revalidation_still_rejects_real_retrieval_regression(tmp_path):
+    service, _pipeline_instance, _canonical = _service(
+        tmp_path, benchmark_items=[{"question": "alpha beta gamma", "intent": "right"}]
+    )
+    _submit(service, question="alpha beta gamma x", intent="wrong")
+    _legacyRetrievalRejection(service)
+    result = _submit(service, question="alpha beta gamma x", intent="wrong")
+    assert result["status"] == "rejected"
+    assert result["reason"] == "retrieval_regression"
+    assert result["validation"]["retrieval_regression"]["retriever_version"] == RETRIEVER_VERSION
 
 
 def _write_corpus(path: Path) -> None:

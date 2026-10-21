@@ -1751,6 +1751,7 @@
   function eventLabel(value) {
     var labels = {
       candidate_staged: "已建立學習候選",
+      candidate_revalidated: "檢索版本更新，重新驗證候選",
       duplicate_candidate: "發現重複候選",
       candidate_pending_review: "候選待人工審核",
       candidate_promoted: "候選已發布至語料",

@@ -1,7 +1,7 @@
 # Phase 9 本輪交付紀錄
 
 日期：2026-10-21。基準：`origin/main` 的 `9a8ecad`。
-三個工作分支已整合至本機 `codex/github-status-followup`，尚未推送。
+三個工作分支已整合至 `codex/github-status-followup`，以此分支提出 PR 至 `main`。
 
 | 工作 | 分支 | 交付 |
 |---|---|---|

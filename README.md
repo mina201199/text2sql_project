@@ -97,6 +97,8 @@ uv run --no-sync python -m eval.run_eval
 
 離線評測讀取 `benchmarks/`，輸出 `reports/eval_latest.json`、歷史紀錄與 SVG。報告的 `mode` 為 `offline_deterministic_rules`；通過此題組代表目前快照上的離線能力，不代表線上模型或任意中文問題的正確率。benchmark 不得晉升為檢索語料。
 
+OpenAI 線上評測另外使用 `python -m eval.run_online_eval`，預設只做預檢，實際呼叫必須明確指定 `--online` 與 `--model`。設定、呼叫上限與報告判讀見 [線上評測指南](docs/ONLINE_EVALUATION.md)；模型名稱與 API key 尚待提供，因此目前沒有真實模型準確率。此次新增問法、修正前後結果與涵蓋限制見 [查詢品質紀錄](docs/query-quality.md)。
+
 可信資料更新需先將新來源清理、對齊成上述六個 CSV 的格式，再透過網頁「資料管理」建立候選、檢查驗證結果並人工核准，詳見 [資料熱插拔流程](docs/SERVING.md#資料熱插拔資料庫版本與稽核)。單純下載檔案不會更新可信資料庫；原始封存目錄也須使用相容的 manifest，不能以下載器產物直接取代。Windows 手動重建 DB 前請先停止服務，避免 SQLite 檔案鎖定。網頁內經人工審核的資料版本切換則可在服務運行時完成。
 
 ```text

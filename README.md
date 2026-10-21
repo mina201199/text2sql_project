@@ -97,7 +97,7 @@ uv run --no-sync python -m eval.run_eval
 
 離線評測讀取 `benchmarks/`，輸出 `reports/eval_latest.json`、歷史紀錄與 SVG。報告的 `mode` 為 `offline_deterministic_rules`；通過此題組代表目前快照上的離線能力，不代表線上模型或任意中文問題的正確率。benchmark 不得晉升為檢索語料。
 
-欲更新官方資料，可先執行 `uv run python -m ingest.fetch`，檢查下載、對齊及品質報告，再重建；這不是展示所必需的步驟。Windows 手動重建 DB 前請先停止服務，避免 SQLite 檔案鎖定。網頁內經人工審核的資料版本切換則可在服務運行時完成。
+可信資料更新需先將新來源清理、對齊成上述六個 CSV 的格式，再透過網頁「資料管理」建立候選、檢查驗證結果並人工核准，詳見 [資料熱插拔流程](docs/SERVING.md#資料熱插拔資料庫版本與稽核)。單純下載檔案不會更新可信資料庫；原始封存目錄也須使用相容的 manifest，不能以下載器產物直接取代。Windows 手動重建 DB 前請先停止服務，避免 SQLite 檔案鎖定。網頁內經人工審核的資料版本切換則可在服務運行時完成。
 
 ```text
 src/ingest/       下載、驗證、SQLite builder 與 schema

@@ -14,7 +14,7 @@ from text2sql.entities import Entities, extract_entities
 from text2sql.llm import GeneratedQuery, LLMProtocol, parse_generated_query
 from text2sql.prompt import build_prompt
 from text2sql.retriever import TfidfRetriever
-from text2sql.router import route
+from text2sql.router import RoutedQuery, route
 from text2sql.semantic_guard import SemanticDecision
 from text2sql.sql_guard import SqlGuard, SqlGuardResult
 
@@ -69,6 +69,7 @@ class Text2SQLPipeline:
         top_k: int = 5,
         ngram_min: int = 2,
         ngram_max: int = 4,
+        use_router: bool = True,
     ):
         if max_attempts < 1:
             raise ValueError("max_attempts 必須至少是 1")
@@ -89,6 +90,7 @@ class Text2SQLPipeline:
         self.semantic_guard = semantic_guard or AllowAllSemanticGuard()
         self.max_attempts = max_attempts
         self.top_k = top_k
+        self.use_router = use_router
 
     def reload_corpus(self, corpus_path: Path | None = None) -> str:
         """Atomically replace the retrieval snapshot used by subsequent queries."""
@@ -145,12 +147,16 @@ class Text2SQLPipeline:
             return self._semantic_error(question_decision, trace)
 
         started = perf_counter()
-        routed = route(
-            question,
-            entities,
-            peak_columns=self.peak_columns,
-            plants=self.plants,
-            data_range=self.data_range,
+        routed = (
+            route(
+                question,
+                entities,
+                peak_columns=self.peak_columns,
+                plants=self.plants,
+                data_range=self.data_range,
+            )
+            if self.use_router
+            else RoutedQuery("other")
         )
         self._trace(trace, "route", started, intent=routed.intent, matched=bool(routed.sql))
         retrieved = []

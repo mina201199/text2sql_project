@@ -1,269 +1,128 @@
 # PowerQuery TW｜台電開放資料 Text2SQL 智慧查詢系統
 
-> 用自然語言探索台灣電力資料，並在回答前先確認資料是否真的足以支持答案。
+用中文查詢台電資料，並在回答前確認 SQL 安全性與資料是否足以支持答案。
 
-![Project](https://img.shields.io/badge/Project-Graduation%20Project-1a5fb4)
-![Domain](https://img.shields.io/badge/Domain-Taipower%20Open%20Data-14498c)
-![Interface](https://img.shields.io/badge/Interface-Text2SQL-2e7d32)
-![Status](https://img.shields.io/badge/Status-Data%20Alignment%20Completed-c25e00)
+目前已實作至 **Phase 9**：SQLite 語意層、離線規則路由、可選 OpenAI adapter、SQL／語意雙守門、離線評測、FastAPI、圖表工作台，以及需登入與人工審核的資料／語料管理。離線模式不需要 API key；它使用確定性規則，未涵蓋的問法會拒答，不是本機生成式模型。
 
-PowerQuery TW 是一套以 **Text2SQL** 為核心的畢業專題。使用者能直接用中文詢問台電公開資料，系統負責理解問題、產生 SQL、驗證查詢安全性與資料語意，最後以文字、指標、圖表及表格呈現結果。
+## 快速開始：本機離線展示
 
-本專題不只追求「能產生 SQL」，更重視一個實務資料系統應具備的能力：**知道哪些問題可以回答、哪些答案需要揭露限制，以及哪些問題不應產生一個看似合理但其實錯誤的數字。**
+需要 Python 3.11 以上與 [uv](https://docs.astral.sh/uv/)。在專案根目錄執行；第一次安裝依賴需要網路，之後的建庫與可信資料查詢使用 repo 內的 CSV，不下載資料、不呼叫模型。
 
-> [!IMPORTANT]
-> 目前已完成兩份台電資料集的清理、長表轉換、機組名稱對齊及語意陷阱盤點；Text2SQL 管線、API 與前端仍依規格分階段開發中。本文會明確區分「已完成成果」與「規劃功能」。
-
-## 專題亮點
-
-| 能力面向 | 我們的做法 | 展現的專業能力 |
-|---|---|---|
-| 自然語言查詢 | 中文問題轉換為受限制的 SQL | LLM 應用、Prompt／Context Engineering |
-| 增量語料學習 | 將成功查詢與人工修正轉成候選語料，驗證後自動更新檢索索引 | MLOps、資料治理、Feedback Loop |
-| 資料工程 | 寬表轉長表、跨資料集名稱對齊、星狀模型 | ETL、資料建模、資料品質管理 |
-| 查詢安全 | 僅允許唯讀查詢，限制資料表、欄位、筆數與執行時間 | SQL AST 驗證、安全設計 |
-| 語意治理 | 在執行前判斷問題是否可答，分成拒答、揭露與澄清 | Domain Knowledge、Guardrail 設計 |
-| 可重現評測 | 區分語料內／語料外題型，量測執行正確率與守門誤攔率 | AI Evaluation、實驗設計 |
-| 視覺化體驗 | 依結果自動選擇圖表、查詢階段回饋、可取消與無障礙設計 | Data Visualization、RWD、Accessibility |
-
-## 我們要解決的問題
-
-一般 Text2SQL 系統可能產生語法正確、可成功執行，卻在領域上完全錯誤的查詢。例如：
-
-```text
-使用者：台中電廠去年總發電量是多少？
+```powershell
+uv sync --frozen --extra dev
+uv run --no-sync python -m project_tasks init-dirs
+uv run --no-sync python -m ingest.build_db
+# 預設模式為 auto；移除此程序繼承的 key，確保本次展示使用離線模式。
+Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
+uv run --no-sync powerquery --serve
 ```
 
-直接對每日資料做 `SUM()` 會得到一個數字，但這個答案至少有兩個問題：
+開啟 <http://127.0.0.1:8000/>。服務視窗按 `Ctrl+C` 停止。macOS／Linux 請將 `Remove-Item` 那行改為 `unset OPENAI_API_KEY`。
 
-1. 台電資料記錄的是「每日系統尖峰時刻的瞬時出力」，單位為萬瓩，不是每日發電量；跨日加總沒有正確的物理意義。
-2. 台中電廠部分氣渦輪機組被收在全系統的殘差欄位，無法從現有資料完整拆回台中電廠總量。
+Windows 也可雙擊 [`啟動.bat`](啟動.bat)，使用 <http://127.0.0.1:8765/>；啟動器會按需同步 dev／online 依賴、建庫，健康檢查通過後開瀏覽器。它沿用程序環境，有 key 時預設 `auto` 會啟用線上 runtime；要固定離線展示請使用上面的明確步驟。
 
-因此，本系統的正確行為不是硬給答案，而是拒絕錯誤計算、說明原因，並建議可被資料支持的替代問法，例如：
+可直接測試：
 
-```text
-「比較 2026 年各月尖峰日的台中燃煤機組出力」
-「查詢 2026 年 7 月全系統尖峰負載最高的日期」
+```powershell
+uv run --no-sync powerquery "2026年6月每日備轉容量率"
+uv run --no-sync powerquery --json "天然氣機組共有幾台？"
 ```
 
-## 系統設計
+展示快照的預期結果：
 
-以下為規格定案後的目標架構；目前已完成圖中「資料擷取／清理」及「名稱與容量對齊」部分。
+| 問題／檢查 | 預期 |
+|---|---|
+| `GET /api/health` | `success: true`、`mode.active_mode: offline` |
+| `GET /api/stats` | 175 台機組、36,928 筆尖峰出力、138 筆歲修紀錄 |
+| 2026年6月每日備轉容量率 | 30 筆，折線圖與原始列 |
+| 天然氣機組共有幾台？ | 24 台 |
+| 2025年1月1日有哪些機組在歲修？ | 成功但 0 筆，沒有圖表；不代表確認當天無歲修 |
+| 台中電廠去年總發電量是多少？ | `PEAK_SUM_ACROSS_DAYS`，拒絕將跨日功率加總成電量 |
+
+完整啟動、管理登入、API 請求、缺檔排查與部署邊界見 [docs/SERVING.md](docs/SERVING.md)。
+
+## 已實作能力
+
+| 能力 | 目前行為 |
+|---|---|
+| 資料工程 | CSV 驗證、機組名稱／容量對齊、長表轉換、SQLite 星狀模型與中文 `v_*` views |
+| 查詢 | 中文意圖／實體抽取、規則路由、TF-IDF 範例檢索；可選線上 LLM 與受限重試 |
+| 安全守門 | SQL AST、唯讀與 view／欄位允許清單、筆數／逾時限制 |
+| 語意守門 | 針對指標、單位、時間、粒度與涵蓋範圍進行拒答、澄清或限制揭露 |
+| 呈現 | SQL、參數、執行 trace、摘要、統計、表格及受限 line／bar／scatter 圖表；CDN 不可用時用本機 SVG |
+| 資料治理 | 六個 CSV 資料槽、候選建庫、人工審核、不可變版本、原子切換與雜湊鏈稽核 |
+| 語料治理 | 去識別、去重、benchmark 洩漏檢查、重播／回歸驗證；候選均須人工核准後發布 |
+| 評測 | 語料內／外題組、結果比對、SQL 攻擊、語意陷阱、誤攔與 ablation 報告 |
 
 ```mermaid
 flowchart LR
-    U[中文自然語言問題] --> R[意圖辨識與實體抽取]
-    R --> C[Schema、領域文件與範例檢索]
-    C --> L[LLM 產生候選 SQL]
-    L --> S{SQL 安全守門}
-    S -- 不安全 --> X[拒絕執行並說明原因]
-    S -- 通過 --> G{資料語意守門}
-    G -- refuse --> X
-    G -- clarify --> Q[請使用者補充條件]
-    G -- disclose --> E[執行唯讀 SQL 並附限制]
-    G -- pass --> E
-    E --> P[產生文字摘要與受限 chart_spec]
-    P --> V[文字、KPI、互動圖表與資料表]
-    V --> F[使用者回饋與修正]
-    F --> H[去識別、去重、守門與品質評測]
-    H --> I[(核准語料與檢索索引)]
-    I --> C
-
-    D1[台電機組設備資料] --> A[清理與名稱、容量對齊]
-    D2[每日電力供需資料] --> A
-    D3[機組歲修排程] --> A
-    A --> DB[(SQLite 星狀模型)]
-    DB --> C
-    DB --> E
+    U[中文問題] --> R[意圖、實體與範例檢索]
+    R --> C[規則 SQL／可選 LLM]
+    C --> S{SQL 與語意守門}
+    S -->|拒答／澄清| X[原因與替代問法]
+    S -->|通過／揭露| DB[(唯讀 SQLite views)]
+    DB --> V[摘要、圖表、表格與來源]
+    V --> H[候選語料驗證與人工審核]
+    H --> R
+    D[CSV 驗證與對齊] --> DB
 ```
 
-### 雙守門機制
+網頁包含查詢中心、資料總覽、資料管理、API 與模型、API 文件五個工作區。公開查詢不需登入；資料、語料及模型管理需管理 session，寫入另需同源與 CSRF 驗證。本機預設 `admin`／`PowerQuery@123` 僅用於 loopback demo；自訂帳密與操作方式見 [管理登入](docs/SERVING.md#資料管理登入)。
 
-| 守門層 | 檢查內容 | 避免的風險 |
-|---|---|---|
-| SQL 安全守門 | 唯讀限制、允許清單、SQL AST、查詢筆數及逾時 | 修改資料、任意查詢、資源濫用 |
-| 資料語意守門 | 指標定義、單位、時間粒度、資料涵蓋與欄位完整性 | 「SQL 能跑，但答案是錯的」 |
+## 資料快照與涵蓋範圍
 
-語意守門不採用單一的「通過／拒絕」，而是依風險分級：
+repo 隨附 `taipower_align/` 的六個建庫 CSV：`units.csv`、`daily.csv`、`crosswalk.csv`、`daily_long.csv`、`outage.csv` 與 `generation_cost.csv`。建庫會產生本機 `data/processed/power.db`，資料版本、來源 SHA-256、筆數與期間寫入 manifest。
 
-- `refuse`：問題會導致錯誤結論，例如把跨日瞬時功率加總成發電量。
-- `disclose`：結果仍可參考，但必須顯示資料缺漏或估計限制。
-- `clarify`：名稱或日期條件不明確，需要使用者補充後才能查詢。
-
-完整 9 條規則與 SQL 形狀定義請見[專案規格附錄 A](docs/superpowers/specs/2026-09-09-text2sql-taipower-design.md#附錄-a語意守門規則全表)。
-
-### 增量語料學習
-
-系統規劃建立可追溯的語料更新流程，讓常見新問法與人工修正能逐步改善 Text2SQL 表現：
-
-```text
-成功查詢／人工修正
-        ↓
-候選 question–SQL pair
-        ↓
-去識別化 → 去重 → SQL 安全驗證 → 語意驗證 → 結果一致性測試
-        ↓
-staging corpus → benchmark 回歸通過 → 正式 corpus
-        ↓
-自動重建 TF-IDF／向量檢索索引並留下版本紀錄
-```
-
-這裡的「自動訓練」主要是**自動擴充高品質語料並重建檢索索引**，不是讓模型直接把每次回答當成正確答案。未經驗證的查詢不得進入正式 corpus，benchmark 也不得成為訓練資料，以防止錯誤累積與評測洩漏。
-
-### 自動圖表回答
-
-查詢結果除了文字與資料表，也能依欄位型別及問題意圖產生圖表：
-
-| 資料形狀 | 建議圖表 | 適用問題 |
-|---|---|---|
-| 日期＋數值 | 折線圖 | 尖峰負載或備轉容量的時間趨勢 |
-| 類別＋數值 | 長條圖 | 不同機組、燃料或電廠比較 |
-| 兩個連續數值 | 散點圖 | 裝置容量與實測最大出力關係 |
-| 單一或不適合繪圖的結果 | KPI／資料表 | 最大值、明細或文字型結果 |
-
-後端只產生白名單格式的 `chart_spec`，前端使用 Plotly 渲染；圖表標題、座標軸、單位、資料來源與限制揭露皆須由查詢結果推導。若結果不適合視覺化，系統應誠實回傳 `chart_spec: null`，而不是硬畫一張誤導性圖表。
-
-## 已完成的資料工程成果
-
-我們已將台電「水火力發電廠位置及機組設備」與「過去電力供需資訊」完成跨資料集對齊，並以裝置容量與歷史實測最大值進行客觀驗證，而非只依賴字串相似度。
-
-| 成果 | 數量／結果 |
+| 展示快照 | 數量／範圍 |
 |---|---:|
-| 機組主檔對齊 | **175 台，100% 完成** |
-| 每日供需欄位 | 64 個機組／彙總欄位 |
-| 可對應機組主檔的欄位 | **43 個（67%）** |
-| 轉換後長表 | **36,928 筆** |
-| 目前資料期間 | 2025-01-01 ～ 2026-07-31，共 577 天 |
-| 已識別資料陷阱 | 10 類 |
+| 機組主檔 | 175 台 |
+| 每日尖峰資料期間 | 2025-01-01 ～ 2026-07-31，577 天 |
+| 每日機組／彙總欄位 | 64 個，其中 43 個可對應機組主檔 |
+| 尖峰出力長表 | 36,928 筆 |
+| 歲修紀錄 | 138 筆，查詢應以實際涵蓋日期為準 |
+| 發電成本 | 2023～2025 年按發電方式的元／度資料；保留審定／自編決算口徑 |
 
-其餘 21 個欄位主要屬於核能、民營電廠、汽電共生及再生能源彙總，本來就不在該機組主檔的涵蓋範圍內，並非單純的配對失敗。詳細方法、欄位定義及驗證結果請見 [`taipower_align/README.md`](taipower_align/README.md)。
+**全量原始資料封存未隨 Git checkout 提供。** `manifest.json` 與 `files/` 屬另外準備的快照；未提供時可信資料查詢仍可用，選擇「全量原始資料」則會回報缺少 manifest。原始資料搜尋／預覽不等於通用跨檔 Text2SQL，也不能取代語意層的可答性限制。準備方式見 [原始資料範圍](docs/SERVING.md#可信資料與全量原始資料)。
 
-## 資料模型
+資料來源包含台電 [機組設備](https://data.gov.tw/dataset/8934)、[過去電力供需](https://data.gov.tw/dataset/19995)、歲修與各種發電方式成本資料。資料使用依政府資料開放授權條款；每日供需來源採滾動視窗，更新時需另行封存，不能把此展示快照視為即時資料。對齊方法見 [taipower_align/README.md](taipower_align/README.md)。
 
-規劃以 SQLite 建立星狀模型，將原始資料的複雜欄名與不同粒度轉換成對 LLM 較穩定的語意層：
+## 驗證與開發
+
+```powershell
+uv run --no-sync pytest
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync python -m eval.run_eval
+```
+
+離線評測讀取 `benchmarks/`，輸出 `reports/eval_latest.json`、歷史紀錄與 SVG。報告的 `mode` 為 `offline_deterministic_rules`；通過此題組代表目前快照上的離線能力，不代表線上模型或任意中文問題的正確率。benchmark 不得晉升為檢索語料。
+
+欲更新官方資料，可先執行 `uv run python -m ingest.fetch`，檢查下載、對齊及品質報告，再重建；這不是展示所必需的步驟。Windows 手動重建 DB 前請先停止服務，避免 SQLite 檔案鎖定。網頁內經人工審核的資料版本切換則可在服務運行時完成。
 
 ```text
-dim_plant ──< dim_unit ──< bridge_b_column
-                              │
-                              ▼
-                       fact_daily_peak
-                              │
-                              ├── dim_date
-                              └── dim_outage
-
-meta_manifest   資料版本、涵蓋期間與來源
-meta_pitfall    已知限制、受影響對象與守門規則依據
-v_*             提供給 Text2SQL 的中文語意檢視
+src/ingest/       下載、驗證、SQLite builder 與 schema
+src/align/        名稱、粒度、歲修與資料陷阱對齊
+src/text2sql/     router、entities、retriever、LLM、雙守門與 pipeline
+src/serving/      FastAPI、runtime、管理驗證、版本／語料治理與靜態前端
+src/eval/         離線評測
+corpus/           核准檢索語料
+benchmarks/       獨立評測題組
+tests/            單元、契約、整合與端到端測試
+configs/          路徑、檢索、模型與護欄設定
 ```
-
-這個設計將「儲存結構」與「LLM 可見的查詢介面」分離：底層採容易維護的英文欄位與正規化結構，模型只允許查詢經審核的中文 `v_*` views。
-
-## 資料來源
-
-| 台電開放資料 | 用途 | 更新頻率 |
-|---|---|---|
-| [水火力發電廠位置及機組設備（資料集 8934）](https://data.gov.tw/dataset/8934) | 電廠、機組、燃料、裝置容量與商轉日期 | 不定期 |
-| [過去電力供需資訊（資料集 19995）](https://data.gov.tw/dataset/19995) | 每日尖峰負載、備轉容量及尖峰時刻機組出力 | 每月 |
-| 機組歲修排程（`d006008`） | 解釋特定機組長時間停機或零出力 | 事件更新 |
-
-> [!WARNING]
-> 「過去電力供需資訊」採滾動視窗，只提供上一年度及本年度至上月份資料，舊資料可能被覆蓋。專案需定期封存原始檔，並將資料版本與涵蓋日期寫入 `meta_manifest`，才能維持可重現性。
-
-資料使用遵循「政府資料開放授權條款－第 1 版」。
-
-## 快速開始：重現目前成果
-
-目前的資料對齊流程只使用 Python 標準函式庫，不需額外安裝套件。
-
-```bash
-cd taipower_align
-python align.py    # 建立 crosswalk.csv 與人讀版驗證報告
-python final.py    # 將每日寬表轉為 daily_long.csv，執行語意驗證
-```
-
-如需從官方來源更新資料：
-
-```bash
-python fetch.py
-python fetch.py --extra   # 額外下載備轉容量、歲修排程等資料
-```
-
-執行後的重要產物：
-
-| 檔案 | 說明 |
-|---|---|
-| `taipower_align/crosswalk.csv` | 台電兩套命名系統的欄位與機組對照表 |
-| `taipower_align/daily_long.csv` | 每日供需寬表轉換後的分析用長表 |
-| `taipower_align/crosswalk.txt` | 容量比值、未對應欄位與異常警示 |
-| `taipower_align/final.txt` | 語意驗證、缺漏機組與欄位分類 |
-
-## 評測設計
-
-本專題會同時評估「查詢做不做得到」與「系統會不會阻止錯誤答案」，避免只用 SQL 字串相似度美化成果。
-
-| 指標 | 衡量目的 |
-|---|---|
-| SQL 執行正確率 | 查詢能否執行並得到正確結果 |
-| Result Match | 生成 SQL 與標準答案的查詢結果是否一致 |
-| 語意陷阱命中率 | 應阻擋或警示的題目是否正確辨識 |
-| 守門誤攔率 | 合法問題是否被錯誤拒絕 |
-| 語料內／語料外表現 | 區分記憶題型與真正泛化能力 |
-
-規劃驗收基準為：語意陷阱命中率至少 95%、誤攔率不高於 5%，並獨立呈現 `in_corpus=false` 題組結果。另以 ablation study 比較移除檢索、對齊資訊與語意守門後的表現差異，量化各模組的實際貢獻。
-
-## 專案結構
-
-```text
-text2sql/
-├── README.md                         # 專案入口
-├── taipower_align/                   # 已完成：資料清理、對齊與驗證
-│   ├── align.py
-│   ├── final.py
-│   ├── fetch.py
-│   ├── crosswalk.csv
-│   └── daily_long.csv
-├── scripts/                          # 台電公開資料下載腳本
-├── docs/AI_AGENT_COLLABORATION.md    # AI Agent 多人協作與整合規範
-├── docs/superpowers/specs/           # 系統、資料、評測完整規格
-└── 參考資料/                          # UI、架構、元件與 API 參考文件
-```
-
-後續實作將依規格加入 `src/ingest`、`src/align`、`src/text2sql`、`src/serving`、`corpus`、`benchmarks` 與 `tests` 等模組。
-
-## 開發里程碑
-
-| 階段 | 內容 | 狀態 |
-|---|---|:---:|
-| Phase 1 | 原始資料盤點、下載與版本管理 | ✅ |
-| Phase 2 | 名稱對齊、長表轉換與資料陷阱分析 | ✅ |
-| Phase 3 | SQLite 星狀模型與中文語意檢視 | ⬜ |
-| Phase 4 | Text2SQL 生成、檢索、失敗重試與增量語料索引 | ⬜ |
-| Phase 5 | SQL 安全守門與資料語意守門 | ⬜ |
-| Phase 6 | 題庫、語料晉升閘門、離線評測與 ablation study | ⬜ |
-| Phase 7 | FastAPI、對話式介面與自動圖表回答 | ⬜ |
 
 ## 已知限制
 
-- 現有每日資料只能回答尖峰時刻的功率問題，不能回答發電量、用電度數、成本、電價或碳排。
-- 2025 年 1 月以前沒有目前這套機組明細；逐時或每 10 分鐘曲線也尚未納入。
-- 6 座電廠的部分機組被收在殘差欄位，無法還原完整的電廠級總出力。
-- 核能、IPP、汽電共生與再生能源彙總欄位缺少相同粒度的機組主檔。
-- 台電不同資料集存在多套機組命名方式，新增資料源時必須重新驗證對齊規則。
+- 尖峰出力是單一時刻的功率，不能跨日加總成發電量；也不能據此估算個別電廠成本或碳排。年度發電方式成本有獨立資料與會計口徑。
+- 每日資料不含逐時／每十分鐘曲線；缺少紀錄或空結果不能推論實際值為零。
+- 部分電廠機組位於殘差或跨廠彙總欄位，不能還原完整電廠出力；核能、IPP 等也缺少相同粒度主檔。
+- 離線模式的路由範圍有限；線上模式仍受相同 SQL 與語意護欄約束，且需自行配置依賴、模型與 key。
+- 主工作台可在無 CDN 時用 SVG；`/docs` 的 Swagger UI 首次載入仍需 jsDelivr。
+- 服務預設僅供本機展示。公開 hosting 與 tunnel 均為另行選擇的部署操作，快速開始不會啟動。
 
-主動揭露限制不是功能缺陷，而是本專題「可信任 Text2SQL」設計的一部分。
+## 進一步文件
 
-## 團隊協作與文件
-
-- [AI Agent 多人協作與整合規範](docs/AI_AGENT_COLLABORATION.md)
-- [完整系統規格](docs/superpowers/specs/2026-09-09-text2sql-taipower-design.md)
-- [資料對齊方法與驗證結果](taipower_align/README.md)
-- [介面總覽與重現流程](參考資料/00-總覽與重現流程.md)
-- [設計 Token 與視覺語言](參考資料/01-設計Token.md)
-- [前端架構與核心機制](參考資料/02-架構與核心機制.md)
-- [元件規格](參考資料/03-元件規格.md)
-- [API 契約](參考資料/04-API契約.md)
-- [無障礙與響應式設計](參考資料/05-無障礙與響應式.md)
-
----
-
-本專題以 **資料工程 × LLM 應用 × 軟體安全 × AI 評測 × 使用者體驗** 為核心，目標不是展示一個會產生 SQL 的聊天機器人，而是打造一個能對資料負責、對答案誠實的自然語言查詢系統。
+- [啟動、管理與 API 使用方式](docs/SERVING.md)
+- [API 契約](src/serving/API_CONTRACT.md)
+- [完整設計規格](docs/superpowers/specs/2026-09-09-text2sql-taipower-design.md)（歷史設計；實際行為以程式與目前使用文件為準）
+- [AI Agent 協作與整合規範](docs/AI_AGENT_COLLABORATION.md)

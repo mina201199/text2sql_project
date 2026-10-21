@@ -636,6 +636,7 @@
 
   function loadHealth() {
     return api("/api/health").then(function (health) {
+      renderRuntime(health.mode);
       byId("statusDot").className = "status-dot connected";
       byId("statusText").textContent = health.demo ? "離線分析服務已就緒" : "線上分析服務已就緒";
       byId("demoBanner").hidden = !health.demo;

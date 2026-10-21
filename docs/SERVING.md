@@ -1,5 +1,7 @@
 # PowerQuery TW 使用方式
 
+本文對應目前 Phase 9 工作台。從乾淨 checkout 即可重現可信資料離線查詢；全量原始封存與線上模型需另外配置。
+
 ## 啟動
 
 ### Windows 一鍵啟動
@@ -11,23 +13,26 @@
 3. 建立必要目錄，並只在 `data/processed/power.db` 不存在時建庫。
 4. 啟動 <http://127.0.0.1:8765/>，健康檢查成功後才開啟預設瀏覽器；若服務已在執行則直接沿用。
 
+第一次同步依賴需要網路。啟動器沿用程序環境，預設 `auto` 遇到 `OPENAI_API_KEY` 時會啟用線上 runtime；要固定離線展示，使用下方手動步驟先移除 key。
+
 服務視窗需保持開啟；要關閉服務時，在該視窗按 `Ctrl+C`。若 Windows 接著詢問 `Terminate batch job (Y/N)?`，輸入 `Y`。啟動失敗時視窗會保留錯誤提示，不會立即消失。
 
 ### 手動啟動
 
-第一次使用需安裝依賴並建立可重現的 SQLite 快照：
+需要 Python 3.11 以上與 uv。在專案根目錄安裝鎖定依賴，並使用 repo 隨附的六個 CSV 建立 SQLite 快照：
 
 ```powershell
-uv sync --extra dev
-uv run python -m project_tasks init-dirs
-uv run python -m ingest.build_db
-uv run powerquery --serve
+uv sync --frozen --extra dev
+uv run --no-sync python -m project_tasks init-dirs
+uv run --no-sync python -m ingest.build_db
+Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
+uv run --no-sync powerquery --serve
 ```
 
-開啟 <http://127.0.0.1:8000> 即可使用。只需要離線規則時不必安裝線上額外依賴；要啟用 OpenAI 長尾查詢時改用：
+開啟 <http://127.0.0.1:8000> 即可使用。移除 key 只影響目前程序環境，避免預設 `auto` 意外使用線上模式；macOS／Linux 請改用 `unset OPENAI_API_KEY`。安裝完成後，建庫與可信資料查詢不需網路；`--no-sync` 避免展示時重新同步依賴。只需要離線規則時不必安裝線上額外依賴；要啟用 OpenAI 長尾查詢時改用：
 
 ```powershell
-uv sync --extra dev --extra online
+uv sync --frozen --extra dev --extra online
 ```
 
 Windows 手動重建 `data/processed/power.db` 前，請先在服務視窗按 `Ctrl+C`。仍在執行的服務、SQLite 檢視器或同步程式可能鎖住檔案。網頁內的「資料管理」使用不可變資料庫版本與原子切換，不覆寫目前正在使用的資料庫，因此展示熱插拔時不需要停止服務。
@@ -35,17 +40,50 @@ Windows 手動重建 `data/processed/power.db` 前，請先在服務視窗按 `C
 命令列查詢不需要管理員登入：
 
 ```powershell
-uv run powerquery "2026年7月備轉容量率最低是哪一天？"
-uv run powerquery --json "天然氣機組共有幾台？"
+uv run --no-sync powerquery "2026年7月備轉容量率最低是哪一天？"
+uv run --no-sync powerquery --json "天然氣機組共有幾台？"
 ```
 
 `.env.example` 是環境變數參考，不會被程式自動載入；請透過 PowerShell、服務管理器或容器環境注入需要的值。
+
+### 離線驗收與缺資料回饋
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+Invoke-RestMethod http://127.0.0.1:8000/api/stats
+$body = @{ question = "2026年6月每日備轉容量率"; execution_mode = "offline"; query_scope = "trusted" } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8000/api/query -Method Post -ContentType "application/json; charset=utf-8" -Body $body
+```
+
+健康檢查應顯示 `mode.active_mode: offline` 與 `online_llm: false`；展示快照為 175 台機組、36,928 筆尖峰出力、138 筆歲修紀錄，日期 2025-01-01～2026-07-31。上述查詢應回 30 筆與 `chart_spec.kind: line`；「天然氣機組共有幾台？」為 24 台。
+
+- 「2025年1月1日有哪些機組在歲修？」可回成功、0 筆、`chart_spec: null`；工作台顯示無可顯示資料列，不應解讀成當天確定沒有歲修。
+- 「台中電廠去年總發電量是多少？」應回業務拒答 `PEAK_SUM_ACROSS_DAYS`，因為跨日尖峰功率不能相加成電量。
+- `/api/health` 回 503 且提示資料庫未就緒：先確認建庫成功與 `data/processed/power.db` 存在；若資料管理已建立工作區，則以其驗證過的 active 版本為準。完整性驗證失敗時應調查來源／版本與稽核紀錄，不要直接刪工作區或覆寫 pointer。
+- `RAW_QUERY_FAILED` 且提示找不到 `manifest.json`：全量原始封存尚未配置，改選「僅可信資料」即可查詢展示 CSV；配置方式見下一節。
+- 離線不支援的長尾問法會拒答；這不是資料庫連線失敗，可先使用常用分析核對服務是否正常。
+
+## 可信資料與全量原始資料
+
+建庫使用 `taipower_align/` 中已版控的 `units.csv`、`daily.csv`、`crosswalk.csv`、`daily_long.csv`、`outage.csv`、`generation_cost.csv`。最後一份提供 2023～2025 年各種發電方式的年度元／度成本與決算口徑，不能推估個別電廠或任意期間成本。
+
+`query_scope` 與 `execution_mode` 是兩個不同選項：
+
+| 資料範圍 | 行為 |
+|---|---|
+| `trusted`（API 預設） | 只查詢 SQLite 語意 views，通過 SQL 與語意雙守門 |
+| `raw` | 搜尋原始資源目錄、調閱受限檔案列或特定實體；不執行 LLM SQL |
+| `auto`（網頁預設） | 優先可信查詢；失敗時僅接受符合原始資料實體調閱條件的 fallback，不把所有拒答換成 raw 搜尋 |
+
+**Git checkout 不含全量原始封存的 `manifest.json` 與 `files/`。** 如需 raw 功能，另行取得相符快照，保持相對路徑，放在 `data/raw/manifest.json` 與 `data/raw/files/`；亦相容專案根目錄的 `manifest.json` 與 `files/`。請在啟動前放好檔案。`data/`、根目錄 manifest 與 files 均不進版控，可信資料離線展示不需要它們。
+
+公開端點 `GET /api/raw/status`、`GET /api/raw/resources` 與 `GET /api/raw/resources/{resource_id}/rows` 提供目錄狀態、搜尋及分頁預覽；預覽最多 200 列，受支援格式、路徑與大小限制。`POST /api/raw/rebuild` 需登入、同源與 CSRF；更換已索引的封存後須重建目錄。原始資源筆數／內容依自行提供的快照而定，不能宣稱 repo 內建全量資源，也不能將 raw 預覽當作可信語意分析。
 
 ## 網頁工作台
 
 左側導覽包含五個工作區：
 
-- **查詢中心**：自然語言查詢、單次執行模式、常用問題，以及只保存非敏感問句的瀏覽器本機歷史。
+- **查詢中心**：自然語言查詢、單次執行模式與資料範圍、常用問題，以及只保存非敏感問句的瀏覽器本機歷史。
 - **資料總覽**：資料期間、尖峰紀錄、機組與歲修筆數，以及主題式分析入口。
 - **資料管理**：登入後管理資料檔、待審資料異動、語料審查、資料庫版本與雜湊鏈稽核紀錄。
 - **API 與模型**：登入後設定 `offline`、`online`、`auto`、模型及程序記憶體內 API key。
@@ -103,7 +141,7 @@ $writeHeaders = @{
 
 ## 資料熱插拔、資料庫版本與稽核
 
-資料管理不是任意 SQL 編輯器，也不接受使用者上傳 SQLite。它只管理五個有 schema 約束的 UTF-8 CSV 資料槽，並透過既有 deterministic builder 重建候選資料庫：
+資料管理不是任意 SQL 編輯器，也不接受使用者上傳 SQLite。它只管理六個有 schema 約束的 UTF-8 CSV 資料槽，並透過既有 deterministic builder 重建候選資料庫：
 
 | 資料槽 | 檔名 | 可新增／替換 | 可移除 |
 |---|---|:---:|:---:|
@@ -112,6 +150,7 @@ $writeHeaders = @{
 | `crosswalk_csv` | `crosswalk.csv` | 是 | 否 |
 | `daily_long_csv` | `daily_long.csv` | 是 | 否 |
 | `outage_csv` | `outage.csv` | 是 | 是 |
+| `generation_cost_csv` | `generation_cost.csv` | 是 | 否 |
 
 上傳上限為 64 MiB。系統會檢查副檔名、UTF-8、NUL、重複／缺少欄位、空資料及跨檔資料品質，再建立候選 SQLite、來源 manifest 與 checksum。上傳、移除和回退都只建立 `pending_review` 變更，不會立刻影響查詢；只有登入者按下人工核准後，才會驗證候選 checksum、原子切換 runtime 與 active pointer。拒絕、建置失敗、舊基線衝突及發布失敗都保留紀錄。
 
@@ -180,8 +219,9 @@ API key 可在啟動前由 `OPENAI_API_KEY` 提供，模型可由 `OPENAI_MODEL`
 
 ## 介面與安全邊界
 
-- 首頁／靜態資源、`/docs`、`/openapi.json`、`GET /api/health`、`GET /api/stats`、`GET /api/examples` 與 `POST /api/query` 保持公開；`GET`／`POST /api/admin/session` 用於查詢狀態與登入，其餘 runtime、語料及資料管理端點需要登入。
+- 首頁／靜態資源、`/docs`、`/openapi.json`、`GET /api/health`、`GET /api/stats`、`GET /api/examples`、raw 狀態／目錄／預覽與 `POST /api/query` 保持公開；`GET`／`POST /api/admin/session` 用於查詢狀態與登入，其餘 runtime、語料及資料管理端點與 raw 重建需要登入。
 - `/docs` 以 nonce CSP、固定版號與 SRI 載入 Swagger UI；第一次使用互動檢視器需要連至 jsDelivr。主工作台內建文件不需要該 CDN。
 - 後端只允許受限的 `line`、`bar`、`scatter` 圖表；前端載入不到 Plotly 時退回原生 SVG。
 - 瀏覽器取消按鈕只停止等待與顯示，不中止已在後端執行的查詢。
 - 服務預設綁定 `127.0.0.1`。若要對外提供，必須覆寫預設帳密、限制 allowed hosts，並由可信任反向代理提供 TLS。記憶體內 OpenAI API key 不等於 API 身分驗證。
+- 公開 hosting／tunnel 為另外選擇的部署操作；本文快速開始與一鍵啟動均不會建立公開網址。

@@ -108,22 +108,26 @@ def extract_date_range(
     if match := (iso or compact):
         return _day_range(*(int(part) for part in match.groups()))
 
+    numeric_month = re.search(r"(?<!\d)(20\d{2})[-/](\d{1,2})(?![-/\d])", question)
+    if numeric_month:
+        return _month_range(*(int(part) for part in numeric_month.groups()))
+
     absolute_day = re.search(
-        rf"(\d{{3,4}})\s*年\s*({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*日", question
+        rf"(\d{{3,4}})\s*年\s*({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*[日號]", question
     )
     if absolute_day:
         year, month, day = absolute_day.groups()
         return _day_range(_calendar_year(year), _number(month), _number(day))
 
     relative_day = re.search(
-        rf"(今年|去年)\s*({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*日", question
+        rf"(今年|去年)\s*({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*[日號]", question
     )
     if relative_day:
         relation, month, day = relative_day.groups()
         year = reference.year - (relation == "去年")
         return _day_range(year, _number(month), _number(day))
 
-    month_day = re.search(rf"({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*日", question)
+    month_day = re.search(rf"({NUMBER_TOKEN})\s*月\s*({NUMBER_TOKEN})\s*[日號]", question)
     if month_day:
         return _day_range(reference.year, *(_number(part) for part in month_day.groups()))
 

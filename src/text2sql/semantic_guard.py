@@ -139,9 +139,14 @@ class SemanticGuard:
         sum_words = ("總和", "加起來", "合計", "相加", "累計", "發電量")
         cross_date_words = ("去年", "今年", "每天", "所有日期", "跨月", "跨月份")
         same_day = any(word in compact for word in ("同一天", "當日", "單日"))
+        explicit_period_energy = (
+            "發電量" in compact
+            and entities.date_range is not None
+            and entities.date_range.start != entities.date_range.end
+        )
         if "成本" not in compact and (
             any(word in compact for word in sum_words)
-            and any(word in compact for word in cross_date_words)
+            and (any(word in compact for word in cross_date_words) or explicit_period_energy)
             and not same_day
         ):
             return self._decision(

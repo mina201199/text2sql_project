@@ -300,6 +300,53 @@ def test_successful_query_learning_is_inspectable_without_persisted_rows(
 
 
 @pytest.mark.e2e
+@pytest.mark.parametrize(
+    ("question", "expectedDays"),
+    [
+        ("2026年7月台中#2有發電幾天", 31),
+        ("2026年7月台中#2沒有發電幾天", 0),
+        ("2026年7月林口三號機出力不是零的天數", 26),
+        ("2026年7月林口三號機出力為零的天數", 5),
+    ],
+)
+def test_retrieval_rejection_preserves_answers_and_corpus(
+    client: TestClient, question: str, expectedDays: int
+) -> None:
+    client.get("/api/training-status").raise_for_status()
+    learningService = client.app.state.learning_service
+    corpusBefore = learningService.corpus_path.read_bytes()
+    referenceQuestion = "2026年7月9日中火二號機尖峰出力多少"
+
+    def queryResult(text: str) -> dict:
+        response = client.post("/api/query", json={"question": text, "execution_mode": "offline"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        return payload["data"]
+
+    referenceBefore = queryResult(referenceQuestion)
+    for _ in range(2):
+        result = queryResult(question)
+        assert result["columns"] == ["天數"]
+        assert result["rows"] == [[expectedDays]]
+        assert result["learning"]["status"] == "rejected"
+        assert result["learning"]["reason"] == "retrieval_regression"
+        checks = result["learning"]["validation"]
+        assert all(
+            check["passed"] for name, check in checks.items() if name != "retrieval_regression"
+        )
+        metrics = checks["retrieval_regression"]["metrics"]
+        assert metrics["retrieval_intent_accuracy"] < metrics["minimum_allowed_accuracy"]
+        assert learningService.corpus_path.read_bytes() == corpusBefore
+
+    referenceAfter = queryResult(referenceQuestion)
+    for key in ("sql", "params", "columns", "rows", "intent"):
+        assert referenceAfter[key] == referenceBefore[key]
+    assert referenceAfter["rows"] == [["2026-07-09", 28.4]]
+    assert learningService.corpus_path.read_bytes() == corpusBefore
+
+
+@pytest.mark.e2e
 def test_refusal_does_not_create_a_learning_candidate(client: TestClient) -> None:
     before_status = client.get("/api/training-status").json()["data"]
     before_events = client.get("/api/corpus/events", params={"limit": 500}).json()["data"]

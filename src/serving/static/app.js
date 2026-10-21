@@ -520,6 +520,28 @@
     return wrap;
   }
 
+  function renderLearningNote(learning) {
+    var note = element("div", "learning-note");
+    if (learning.status === "rejected" && learning.reason === "retrieval_regression") {
+      note.appendChild(element("strong", "", "語料學習：未納入語料（檢索評測退步）"));
+      note.appendChild(element("span", "", "查詢結果不受影響。加入這筆範例會降低既有評測的檢索表現，因此保留原本語料。"));
+      var check = learning.validation && learning.validation.retrieval_regression;
+      var metrics = check && check.metrics;
+      if (metrics && Number.isFinite(metrics.baseline_retrieval_intent_accuracy) && Number.isFinite(metrics.retrieval_intent_accuracy)) {
+        note.appendChild(element("span", "", "收錄評測紀錄：首選範例意圖符合率 " + (metrics.baseline_retrieval_intent_accuracy * 100).toFixed(2) + "% → " + (metrics.retrieval_intent_accuracy * 100).toFixed(2) + "%（這不是查詢答案正確率）。"));
+      }
+      var diagnostic = element("details");
+      diagnostic.appendChild(element("summary", "", "技術原因"));
+      diagnostic.appendChild(element("code", "", learning.reason));
+      note.appendChild(diagnostic);
+      return note;
+    }
+    var learningState = statusLabel(learning.status || (learning.accepted ? "已加入學習流程" : "未加入學習流程"));
+    note.appendChild(element("strong", "", "語料學習：" + learningState));
+    if (learning.reason) note.appendChild(element("span", "", "（" + learning.reason + "）"));
+    return note;
+  }
+
   function renderResult(data) {
     var card = element("article", "message result-card");
     var head = element("header", "result-head");
@@ -533,11 +555,7 @@
       card.appendChild(element("div", "callout", typeof disclosure === "string" ? disclosure : disclosure.reason || disclosure.message || JSON.stringify(disclosure)));
     });
     if (data.learning && typeof data.learning === "object") {
-      var learningState = statusLabel(data.learning.status || (data.learning.accepted ? "已加入學習流程" : "未加入學習流程"));
-      var learningNote = element("div", "learning-note");
-      learningNote.appendChild(element("strong", "", "語料學習：" + learningState));
-      if (data.learning.reason) learningNote.appendChild(element("span", "", "（" + data.learning.reason + "）"));
-      card.appendChild(learningNote);
+      card.appendChild(renderLearningNote(data.learning));
     }
     var kpis = element("div", "kpis");
     var count = element("div", "kpi");
@@ -2034,6 +2052,7 @@
     appendDetail(grid, "建立時間", formatDate(item.created_at));
     appendDetail(grid, "更新時間", formatDate(item.updated_at || item.trained_at));
     if (grid.childNodes.length) body.appendChild(grid);
+    if (item.status === "rejected" && item.reason === "retrieval_regression") body.appendChild(renderLearningNote(item));
     var sources = corpusDataSources(item);
     var sourceSection = element("section", "dialog-section source-section");
     sourceSection.appendChild(element("h3", "", "查詢所使用的資料檔"));

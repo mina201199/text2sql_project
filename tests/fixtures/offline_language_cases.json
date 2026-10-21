@@ -1,0 +1,942 @@
+{
+  "version": 1,
+  "source": "taipower_align/daily_long.csv",
+  "source_sha256": "c84d9f92e8087cfea82fdee7a4720c500a38a21b790c56ce33019f283b3a505e",
+  "meaning": "每日系統尖峰時刻出力；正出力／零出力天數不代表全天發電／停機天數。題庫供離線規則回歸使用，不自動發布至檢索語料。",
+  "cases": [
+    {
+      "id": "offline-001",
+      "category": "unit_alias",
+      "question": "2026年7月9日中火二號機尖峰出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          28.4
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "台中#2",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-002",
+      "category": "unit_alias",
+      "question": "2026/07/09臺中發電廠第２號機尖峰出力",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          28.4
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "台中#2",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-003",
+      "category": "unit_alias",
+      "question": "20260709台中電廠第十號機輸出多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          28.9
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "台中#10",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-004",
+      "category": "unit_alias",
+      "question": "2026年7月9日中二機的尖峰出力",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          28.4
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "台中#2",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-005",
+      "category": "unit_alias",
+      "question": "2026年7月9日林口發電廠第一號機的功率",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          74.3
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "林口#1",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-006",
+      "category": "unit_alias",
+      "question": "2026年7月9日林三機出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          73.7
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-007",
+      "category": "unit_alias",
+      "question": "2026年7月9日大林電廠第兩號機尖峰出力",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          75.9
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "大林#2",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-008",
+      "category": "unit_alias",
+      "question": "2026年7月9日大二機的出力",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          75.9
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "大林#2",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-009",
+      "category": "unit_alias",
+      "question": "2026年7月9日大潭彙總尖峰出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          659.0
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "大潭 (#1-#9)",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-010",
+      "category": "unit_alias",
+      "question": "2026年7月9日通霄電廠彙總出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          282.2
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "通霄 (#1-#6、GT#9)",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-011",
+      "category": "unit_alias",
+      "question": "2026年7月9日興達燃煤第三號機尖峰出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          0.0
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "興達#3",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-012",
+      "category": "unit_alias",
+      "question": "2026年7月9日興達複循環彙總尖峰出力多少",
+      "columns": [
+        "日期",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "2026-07-09",
+          102.4
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" = ? LIMIT 1",
+      "params": [
+        "興達 (#1-#5)",
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-013",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機出力不是零的天數",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-014",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機出力不等於0有幾天",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-015",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機出力大於零有多少天",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-016",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機有出力的日子有幾天",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-017",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機出力大於０的天數",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-018",
+      "category": "positive_days",
+      "question": "2026年7月林口三號機非零輸出共幾日",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          26
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-019",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機出力為零的天數",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-020",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機出力等於0有幾天",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-021",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機沒有發電的日子有多少天",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-022",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機無出力共幾日",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-023",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機出力是０的天數",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-024",
+      "category": "zero_days",
+      "question": "2026年7月林口三號機沒出力的天數",
+      "columns": [
+        "天數"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ],
+      "reference_sql": "SELECT COUNT(*) AS \"天數\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-025",
+      "category": "date_list",
+      "question": "2026年7月林口電廠第3號機出力不是零的是哪幾天",
+      "columns": [
+        "日期"
+      ],
+      "rows": [
+        [
+          "2026-07-01"
+        ],
+        [
+          "2026-07-02"
+        ],
+        [
+          "2026-07-03"
+        ],
+        [
+          "2026-07-04"
+        ],
+        [
+          "2026-07-05"
+        ],
+        [
+          "2026-07-06"
+        ],
+        [
+          "2026-07-07"
+        ],
+        [
+          "2026-07-08"
+        ],
+        [
+          "2026-07-09"
+        ],
+        [
+          "2026-07-10"
+        ],
+        [
+          "2026-07-11"
+        ],
+        [
+          "2026-07-12"
+        ],
+        [
+          "2026-07-13"
+        ],
+        [
+          "2026-07-14"
+        ],
+        [
+          "2026-07-15"
+        ],
+        [
+          "2026-07-16"
+        ],
+        [
+          "2026-07-17"
+        ],
+        [
+          "2026-07-18"
+        ],
+        [
+          "2026-07-19"
+        ],
+        [
+          "2026-07-20"
+        ],
+        [
+          "2026-07-26"
+        ],
+        [
+          "2026-07-27"
+        ],
+        [
+          "2026-07-28"
+        ],
+        [
+          "2026-07-29"
+        ],
+        [
+          "2026-07-30"
+        ],
+        [
+          "2026-07-31"
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 ORDER BY \"日期\" LIMIT 200",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-026",
+      "category": "date_list",
+      "question": "2026年7月林口電廠第3號機哪些日子有出力",
+      "columns": [
+        "日期"
+      ],
+      "rows": [
+        [
+          "2026-07-01"
+        ],
+        [
+          "2026-07-02"
+        ],
+        [
+          "2026-07-03"
+        ],
+        [
+          "2026-07-04"
+        ],
+        [
+          "2026-07-05"
+        ],
+        [
+          "2026-07-06"
+        ],
+        [
+          "2026-07-07"
+        ],
+        [
+          "2026-07-08"
+        ],
+        [
+          "2026-07-09"
+        ],
+        [
+          "2026-07-10"
+        ],
+        [
+          "2026-07-11"
+        ],
+        [
+          "2026-07-12"
+        ],
+        [
+          "2026-07-13"
+        ],
+        [
+          "2026-07-14"
+        ],
+        [
+          "2026-07-15"
+        ],
+        [
+          "2026-07-16"
+        ],
+        [
+          "2026-07-17"
+        ],
+        [
+          "2026-07-18"
+        ],
+        [
+          "2026-07-19"
+        ],
+        [
+          "2026-07-20"
+        ],
+        [
+          "2026-07-26"
+        ],
+        [
+          "2026-07-27"
+        ],
+        [
+          "2026-07-28"
+        ],
+        [
+          "2026-07-29"
+        ],
+        [
+          "2026-07-30"
+        ],
+        [
+          "2026-07-31"
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 ORDER BY \"日期\" LIMIT 200",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-027",
+      "category": "date_list",
+      "question": "2026年7月林口電廠第3號機出力為零的日期清單",
+      "columns": [
+        "日期"
+      ],
+      "rows": [
+        [
+          "2026-07-21"
+        ],
+        [
+          "2026-07-22"
+        ],
+        [
+          "2026-07-23"
+        ],
+        [
+          "2026-07-24"
+        ],
+        [
+          "2026-07-25"
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 ORDER BY \"日期\" LIMIT 200",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-028",
+      "category": "date_list",
+      "question": "2026年7月林口電廠第3號機哪些天沒有出力",
+      "columns": [
+        "日期"
+      ],
+      "rows": [
+        [
+          "2026-07-21"
+        ],
+        [
+          "2026-07-22"
+        ],
+        [
+          "2026-07-23"
+        ],
+        [
+          "2026-07-24"
+        ],
+        [
+          "2026-07-25"
+        ]
+      ],
+      "reference_sql": "SELECT \"日期\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" = 0 ORDER BY \"日期\" LIMIT 200",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-029",
+      "category": "extreme",
+      "question": "2026年7月中火二號機最高尖峰出力",
+      "columns": [
+        "最大值"
+      ],
+      "rows": [
+        [
+          51.5
+        ]
+      ],
+      "reference_sql": "SELECT MAX(\"尖峰出力_萬瓩\") AS \"最大值\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? LIMIT 1",
+      "params": [
+        "台中#2",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-030",
+      "category": "extreme",
+      "question": "2026年7月臺中電廠第十號機最低非零出力",
+      "columns": [
+        "最小值"
+      ],
+      "rows": [
+        [
+          24.9
+        ]
+      ],
+      "reference_sql": "SELECT MIN(\"尖峰出力_萬瓩\") AS \"最小值\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "台中#10",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-031",
+      "category": "extreme",
+      "question": "2026年7月林三機最小尖峰出力",
+      "columns": [
+        "最小值"
+      ],
+      "rows": [
+        [
+          0.0
+        ]
+      ],
+      "reference_sql": "SELECT MIN(\"尖峰出力_萬瓩\") AS \"最小值\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-032",
+      "category": "extreme",
+      "question": "2026年7月林口三號機出力不是零的最低值",
+      "columns": [
+        "最小值"
+      ],
+      "rows": [
+        [
+          13.4
+        ]
+      ],
+      "reference_sql": "SELECT MIN(\"尖峰出力_萬瓩\") AS \"最小值\" FROM v_peak WHERE \"機組欄位\" = ? AND \"日期\" BETWEEN ? AND ? AND \"尖峰出力_萬瓩\" > 0 LIMIT 1",
+      "params": [
+        "林口#3",
+        "2026-07-01",
+        "2026-07-31"
+      ]
+    },
+    {
+      "id": "offline-033",
+      "category": "ranking",
+      "question": "2026年7月9日尖峰出力由大到小前兩名",
+      "columns": [
+        "機組欄位",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "太陽能發電",
+          844.2
+        ],
+        [
+          "大潭 (#1-#9)",
+          659.0
+        ]
+      ],
+      "reference_sql": "SELECT \"機組欄位\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"日期\" = ? ORDER BY \"尖峰出力_萬瓩\" DESC LIMIT 2",
+      "params": [
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-034",
+      "category": "ranking",
+      "question": "2026年7月9日功率不是零的由小到大前兩名",
+      "columns": [
+        "機組欄位",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "水里",
+          0.7
+        ],
+        [
+          "碧海",
+          1.1
+        ]
+      ],
+      "reference_sql": "SELECT \"機組欄位\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"日期\" = ? AND \"尖峰出力_萬瓩\" > 0 ORDER BY \"尖峰出力_萬瓩\" ASC LIMIT 2",
+      "params": [
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-035",
+      "category": "ranking",
+      "question": "2026年7月9日出力大於0的最低兩名",
+      "columns": [
+        "機組欄位",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "水里",
+          0.7
+        ],
+        [
+          "碧海",
+          1.1
+        ]
+      ],
+      "reference_sql": "SELECT \"機組欄位\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"日期\" = ? AND \"尖峰出力_萬瓩\" > 0 ORDER BY \"尖峰出力_萬瓩\" ASC LIMIT 2",
+      "params": [
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-036",
+      "category": "ranking",
+      "question": "２０２６年７月９日尖峰出力最高的兩名",
+      "columns": [
+        "機組欄位",
+        "尖峰出力_萬瓩"
+      ],
+      "rows": [
+        [
+          "太陽能發電",
+          844.2
+        ],
+        [
+          "大潭 (#1-#9)",
+          659.0
+        ]
+      ],
+      "reference_sql": "SELECT \"機組欄位\", \"尖峰出力_萬瓩\" FROM v_peak WHERE \"日期\" = ? ORDER BY \"尖峰出力_萬瓩\" DESC LIMIT 2",
+      "params": [
+        "2026-07-09"
+      ]
+    },
+    {
+      "id": "offline-037",
+      "category": "guard",
+      "question": "2026年7月9日興達電廠第三號機出力多少",
+      "error_code": "AMBIGUOUS_UNIT_NAME"
+    },
+    {
+      "id": "offline-038",
+      "category": "guard",
+      "question": "2026年7月9日興達發電廠第３號機功率",
+      "error_code": "AMBIGUOUS_UNIT_NAME"
+    },
+    {
+      "id": "offline-039",
+      "category": "guard",
+      "question": "2028年7月中火二號機出力不是零有幾天",
+      "error_code": "DATA_RANGE_OUT_OF_BOUNDS"
+    },
+    {
+      "id": "offline-040",
+      "category": "guard",
+      "question": "2026年7月中火二號機累計發電量多少度",
+      "error_code": "PEAK_SUM_ACROSS_DAYS"
+    },
+    {
+      "id": "offline-041",
+      "category": "guard",
+      "question": "2026年7月臺中電廠第十號機發電量多少",
+      "error_code": "PEAK_SUM_ACROSS_DAYS"
+    },
+    {
+      "id": "offline-042",
+      "category": "guard",
+      "question": "2026年7月9日中火第100號機尖峰出力多少",
+      "error_code": "UNKNOWN_UNIT_NAME"
+    },
+    {
+      "id": "offline-043",
+      "category": "guard",
+      "question": "2026年7月9日臺中第十一號機尖峰出力",
+      "error_code": "UNKNOWN_UNIT_NAME"
+    },
+    {
+      "id": "offline-044",
+      "category": "guard",
+      "question": "2026年7月9日大潭第三號機尖峰出力",
+      "error_code": "NO_UNIT_DETAIL"
+    }
+  ]
+}

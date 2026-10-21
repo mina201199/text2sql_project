@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from align.naming import chinese_number
 from text2sql.aliases import resolve_peak_column, resolve_peak_columns, resolve_plant
-from text2sql.entities import Entities
+from text2sql.entities import FULLWIDTH_DIGITS, NUMBER_TOKEN, Entities
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class RoutedQuery:
 
 
 def classify_intent(question: str) -> str:
-    question = re.sub(r"\s+", "", question)
+    question = re.sub(r"\s+", "", question.translate(FULLWIDTH_DIGITS))
     if "成本" in question:
         return "generation_cost"
     system_words = ("負載", "備轉", "供電能力", "工業用電", "民生用電", "系統指標")
@@ -49,24 +49,29 @@ def classify_intent(question: str) -> str:
     if ("電廠" in question or "廠" in question) and any(word in question for word in plant_words):
         return "plant_units"
 
-    ranking_shape = any(
-        word in question
-        for word in (
-            "前三",
-            "前四",
-            "前五",
-            "前六",
-            "前十",
-            "排行",
-            "排序",
-            "名次",
-            "由高到低",
-            "由小到大",
+    ranking_shape = (
+        any(
+            word in question
+            for word in (
+                "前三",
+                "前四",
+                "前五",
+                "前六",
+                "前十",
+                "排行",
+                "排序",
+                "名次",
+                "由高到低",
+                "由低到高",
+                "由小到大",
+            )
         )
-    ) or bool(
-        re.search(
-            r"(?:最大|最小|最高|最低)(?:的)?[0-9一二三四五六七八九十]+(?:名|欄|個|台)",
-            question,
+        or bool(re.search(rf"前{NUMBER_TOKEN}(?:名|欄|個|台)(?!月)", question))
+        or bool(
+            re.search(
+                r"(?:最大|最小|最高|最低)(?:的)?[0-9一二三四五六七八九十]+(?:名|欄|個|台)",
+                question,
+            )
         )
     )
     if ranking_shape and any(word in question for word in ("出力", "功率", "欄位")):
@@ -117,8 +122,9 @@ def classify_intent(question: str) -> str:
 
     explicit_day = bool(
         re.search(r"20\d{2}[-/]\d{1,2}[-/]\d{1,2}", question)
+        or re.search(r"(?<!\d)20\d{6}(?!\d)", question)
         or re.search(
-            r"(?:20\d{2}年|今年|去年)?[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日",
+            rf"(?:20\d{{2}}年|今年|去年)?{NUMBER_TOKEN}月{NUMBER_TOKEN}[日號]",
             question,
         )
         or any(word in question for word in ("某天", "指定日期", "指定日", "同一天"))
@@ -311,7 +317,9 @@ def route(
 
     if intent == "daily_ranking" and entities.explicit_date:
         direction = (
-            "ASC" if any(word in question for word in ("最低", "最小", "由小到大")) else "DESC"
+            "ASC"
+            if any(word in question for word in ("最低", "最小", "由小到大", "由低到高"))
+            else "DESC"
         )
         limit = entities.top_n or (64 if "所有" in question else 20)
         filters = ['"日期" = ?']
@@ -438,8 +446,8 @@ def route(
         resolution = resolve_peak_column(question, peak_columns)
         if resolution.value:
             clause, range_params = _range_clause(bounded_range)
-            positive = "沒有出力" not in question and any(
-                word in question for word in ("有出力", "有值", "非零")
+            positive = not any(word in question for word in ("沒有出力", "沒有發電")) and any(
+                word in question for word in ("有出力", "有發電", "有值", "非零")
             )
             operator = ">" if positive else "="
             params = (resolution.value, *range_params)

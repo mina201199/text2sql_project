@@ -195,6 +195,7 @@ pre { overflow: auto; padding: 13px; border-radius: 9px; color: #dceaff; backgro
 .metric-card p, .metric-card small, .metric-card strong { display: block; margin: 0; }
 .metric-card p { color: var(--muted); font-size: .72rem; }
 .metric-card strong { overflow: hidden; margin: 1px 0; font-size: clamp(1.04rem, 1.8vw, 1.25rem); text-overflow: ellipsis; white-space: nowrap; }
+#dateRange { overflow: visible; font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
 .metric-card small { color: #8795a7; font-size: .65rem; }
 .metric-card.compact { min-height: 86px; padding: 15px 17px; }
 .metric-card.compact strong { font-size: 1.35rem; }

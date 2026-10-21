@@ -108,9 +108,22 @@ class SemanticGuard:
         compact = re.sub(r"\s+", "", question)
 
         cost_types = (
-            "火力", "核能", "抽蓄", "再生能源", "慣常水力", "風力", "太陽光電",
-            "地熱", "汽電共生", "民營電廠", "燃油", "燃煤", "燃氣", "發購電",
-            "自發電力小計", "購入電力小計",
+            "火力",
+            "核能",
+            "抽蓄",
+            "再生能源",
+            "慣常水力",
+            "風力",
+            "太陽光電",
+            "地熱",
+            "汽電共生",
+            "民營電廠",
+            "燃油",
+            "燃煤",
+            "燃氣",
+            "發購電",
+            "自發電力小計",
+            "購入電力小計",
         )
         if "成本" in compact and not any(name in compact for name in cost_types):
             year = entities.date_range.start[:4] if entities.date_range else "2025"
@@ -126,9 +139,14 @@ class SemanticGuard:
         sum_words = ("總和", "加起來", "合計", "相加", "累計", "發電量")
         cross_date_words = ("去年", "今年", "每天", "所有日期", "跨月", "跨月份")
         same_day = any(word in compact for word in ("同一天", "當日", "單日"))
+        explicit_period_energy = (
+            "發電量" in compact
+            and entities.date_range is not None
+            and entities.date_range.start != entities.date_range.end
+        )
         if "成本" not in compact and (
             any(word in compact for word in sum_words)
-            and any(word in compact for word in cross_date_words)
+            and (any(word in compact for word in cross_date_words) or explicit_period_energy)
             and not same_day
         ):
             return self._decision(

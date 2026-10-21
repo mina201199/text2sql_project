@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 
 from align.naming import chinese_number
+from text2sql.entities import FULLWIDTH_DIGITS
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,8 @@ def resolve_plant(question: str, plants: set[str]) -> AliasResolution:
 
 
 def resolve_peak_column(question: str, columns: set[str]) -> AliasResolution:
-    ambiguous_hsinta = re.search(r"興達\s*#?\s*(?:3|(?:第)?三)(?:號|機|部|相關|是|的|\b)", question)
+    question = question.translate(FULLWIDTH_DIGITS)
+    ambiguous_hsinta = re.search(r"興達\s*#?\s*(?:第)?(?:3|三)(?:號|機|部|相關|是|的|\b)", question)
     if ambiguous_hsinta:
         candidates = tuple(column for column in ("興達#3", "興達 (#1-#5)") if column in columns)
         if len(candidates) > 1:
@@ -51,7 +53,7 @@ def resolve_peak_column(question: str, columns: set[str]) -> AliasResolution:
         ties = tuple(column for column in exact if len(column) == len(longest))
         return AliasResolution(longest if len(ties) == 1 else None, ties, len(ties) > 1)
 
-    match = re.search(r"(台中|林口|大林|興達)\s*#?(\d{1,2})\s*(?:號|機)?", question)
+    match = re.search(r"(台中|林口|大林|興達)\s*(?:第)?#?(\d{1,2})\s*(?:號|機)?", question)
     if match:
         plant, number = match.groups()
         candidate = f"{plant}#{int(number)}"

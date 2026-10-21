@@ -309,7 +309,7 @@ def test_successful_query_learning_is_inspectable_without_persisted_rows(
         ("2026年7月林口三號機出力為零的天數", 5),
     ],
 )
-def test_retrieval_rejection_preserves_answers_and_corpus(
+def test_retrieval_admission_preserves_answers_and_corpus(
     client: TestClient, question: str, expectedDays: int
 ) -> None:
     client.get("/api/training-status").raise_for_status()
@@ -329,14 +329,12 @@ def test_retrieval_rejection_preserves_answers_and_corpus(
         result = queryResult(question)
         assert result["columns"] == ["天數"]
         assert result["rows"] == [[expectedDays]]
-        assert result["learning"]["status"] == "rejected"
-        assert result["learning"]["reason"] == "retrieval_regression"
+        assert result["learning"]["status"] == "pending_review"
+        assert result["learning"]["reason"] == "manual_review_required"
         checks = result["learning"]["validation"]
-        assert all(
-            check["passed"] for name, check in checks.items() if name != "retrieval_regression"
-        )
+        assert all(check["passed"] for check in checks.values())
         metrics = checks["retrieval_regression"]["metrics"]
-        assert metrics["retrieval_intent_accuracy"] < metrics["minimum_allowed_accuracy"]
+        assert metrics["retrieval_intent_accuracy"] >= metrics["minimum_allowed_accuracy"]
         assert learningService.corpus_path.read_bytes() == corpusBefore
 
     referenceAfter = queryResult(referenceQuestion)

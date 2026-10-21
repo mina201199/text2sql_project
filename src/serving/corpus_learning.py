@@ -29,6 +29,7 @@ from text2sql.corpus_builder import CorpusCandidate, deidentify, promote_batch
 from text2sql.entities import extract_entities
 from text2sql.llm import GeneratedQuery
 from text2sql.pipeline import PipelineResponse, Text2SQLPipeline
+from text2sql.retriever import RETRIEVER_VERSION
 
 CANDIDATE_SCHEMA = "corpus-candidates-v1"
 EVENT_SCHEMA = "corpus-events-v1"
@@ -667,6 +668,20 @@ class CorpusLearningService:
                 None,
             )
             if exact is not None:
+                previousCheck = exact.get("validation", {}).get("retrieval_regression", {})
+                if (
+                    exact["status"] == "rejected"
+                    and exact.get("reason") == "retrieval_regression"
+                    and previousCheck.get("retriever_version") != RETRIEVER_VERSION
+                ):
+                    # 僅重驗舊檢索器的拒絕；人工決定與其他驗證失敗不會被重開。
+                    self._append_event(
+                        "candidate_revalidated",
+                        candidate_id=exact["id"],
+                        previous_validation=exact.get("validation", {}),
+                        retriever_version=RETRIEVER_VERSION,
+                    )
+                    return self._validateCandidateForReview(exact, entries, active_pipeline)
                 self._append_event(
                     "duplicate_candidate",
                     candidate_id=exact["id"],
@@ -711,30 +726,35 @@ class CorpusLearningService:
                 revision_of=revision_of,
             )
 
-            validation, reason = self._validate_entry(entry, active_pipeline)
-            entry["validation"] = validation
-            entry["updated_at"] = _now()
-            if reason:
-                duplicate = reason in {"duplicate_id", "duplicate_question"}
-                entry["status"] = "ignored" if duplicate else "rejected"
-                entry["reason"] = reason
-                self._save_candidates(entries)
-                self._append_event(
-                    "candidate_ignored" if duplicate else "candidate_rejected",
-                    candidate_id=identifier,
-                    reason=reason,
-                )
-                return _json_value(entry)
+            return self._validateCandidateForReview(entry, entries, active_pipeline)
 
-            entry["status"] = "pending_review"
-            entry["reason"] = "manual_review_required"
+    def _validateCandidateForReview(
+        self, entry: dict[str, Any], entries: list[dict[str, Any]], pipeline: Text2SQLPipeline
+    ) -> dict[str, Any]:
+        validation, reason = self._validate_entry(entry, pipeline)
+        entry["validation"] = validation
+        entry["updated_at"] = _now()
+        if reason:
+            duplicate = reason in {"duplicate_id", "duplicate_question"}
+            entry["status"] = "ignored" if duplicate else "rejected"
+            entry["reason"] = reason
             self._save_candidates(entries)
             self._append_event(
-                "candidate_pending_review",
-                candidate_id=identifier,
-                source=entry["source"],
+                "candidate_ignored" if duplicate else "candidate_rejected",
+                candidate_id=entry["id"],
+                reason=reason,
             )
             return _json_value(entry)
+
+        entry["status"] = "pending_review"
+        entry["reason"] = "manual_review_required"
+        self._save_candidates(entries)
+        self._append_event(
+            "candidate_pending_review",
+            candidate_id=entry["id"],
+            source=entry["source"],
+        )
+        return _json_value(entry)
 
     @staticmethod
     def _candidate_id(
@@ -862,6 +882,7 @@ class CorpusLearningService:
         validation["retrieval_regression"] = {
             "passed": regression_passed,
             "metrics": metrics,
+            "retriever_version": RETRIEVER_VERSION,
         }
         if not regression_passed:
             return validation, "retrieval_regression"

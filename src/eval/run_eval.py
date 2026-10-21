@@ -163,7 +163,7 @@ def _rag_ablation(corpus_path: Path, eval_items: list[dict[str, Any]]) -> dict[s
         "metric": "top1_intent_accuracy",
         "enabled": accuracy(enabled),
         "disabled_default_other": accuracy(disabled),
-        "note": "這是檢索器本身的離線指標，不假裝是線上 LLM 準確率。",
+        "note": "這是結合意圖規則與 TF-IDF 的檢索離線指標，不代表線上 LLM 答案準確率。",
     }
 
 

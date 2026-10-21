@@ -4,6 +4,50 @@
 
 目前已實作至 **Phase 9**：SQLite 語意層、離線規則路由、可選 OpenAI adapter、SQL／語意雙守門、離線評測、FastAPI、圖表工作台，以及需登入與人工審核的資料／語料管理。離線模式不需要 API key；它使用確定性規則，未涵蓋的問法會拒答，不是本機生成式模型。
 
+## 組員交接：2026-10-21
+
+**程式碼基線：`main` 的 `47a7bf1`。** 本節是最新交接狀態；`docs/PHASE9_STATUS.md`、舊分工文件與歷史 checkpoint 的測試數字屬於當時版本，不代表本次基線。
+
+### 已完成與驗證
+
+- [PR #2](https://github.com/mina201199/text2sql_project/pull/2)：自然語言標準答案題組、離線規則與機組別名，詳見 [問句與答案包](docs/offline-language-pack.md)。
+- [PR #3](https://github.com/mina201199/text2sql_project/pull/3)：清楚區分查詢成功與語料收錄失敗，提供檢索評測差異及技術原因。
+- [PR #4](https://github.com/mina201199/text2sql_project/pull/4)：同類分析意圖優先、類內 TF-IDF 排序；未知意圖或沒有同類範例時維持字詞排序。舊版本因 `retrieval_regression` 被拒絕的候選，再次送出時會重跑完整驗證，保留舊驗證稽核紀錄；通過後仍須人工審核。
+- 本機完整測試 **345 passed**；Ruff lint／format 通過；PR #4 的 push 與 pull request CI 均通過並合併。
+- 同一批 golden＋eval **140 題**的首選範例意圖符合數由 **72 提升至 131（93.57%）**，原先符合題目無退步。四筆候選單獨及按 24 種順序累計加入，皆維持 131／140；門檻未放寬，benchmark 未加入語料。
+- 原有離線意圖 80／80、執行 60／60、語意陷阱 45／45、SQL 攻擊阻擋 15／15、正常問題誤攔 0／20。這些成績與檢索符合率都不是線上 LLM 答案準確率。
+
+### 尚未完成／待接手
+
+分工代號沿用 [四人分工](docs/TEAM_4_ROLES.md)：A 資料、B Text2SQL／語料、C 安全／評測、D API／前端／整合。以下是建議承接角色，不代表已指派給特定組員。
+
+| 優先度 | 工作與目前狀態 | 建議承接 | 下一步與完成條件 |
+|---|---|---|---|
+| P0 | **OpenAI 真實模型評測未執行**；串接、fake client 測試與預檢已完成，實際模型 ID、key 設定位置仍待提供 | B＋C，D 協助設定 | 先取得模型與設定位置，依 [線上評測指南](docs/ONLINE_EVALUATION.md) 執行 dry-run，再在確認呼叫範圍後執行有上限的線上評測。提交獨立、去敏感資訊的結果；分開報告純模型與規則混合路徑，勿用離線成績代替。 |
+| P1 | **四筆候選已通過學習評測，但尚未人工核准發布** | B | 依下表重現，在「資料管理 → 語料審查」檢查 SQL、參數、來源與驗證結果，再由組員決定核准／拒絕。核准會再次驗證；驗收發布後索引同步、重啟可還原、原答案不變。待審核是既有治理流程，不是系統錯誤。 |
+| P1 | **檢索仍有 9／140 題首選意圖不符**，皆為 `other` 題組 | B＋C | 從 `eval-other-{01,03,04,05,06}`、`golden-other-{01,03,05,07}` 分析複合／未分類問題。以獨立的新問法補語料或改善排序，保留既有正確題目、完整答案與安全評測。不得將這些 benchmark 問句／標準 SQL 複製進 corpus，也不得降低學習門檻。 |
+| P1 | **新資料與全量原始封存尚待準備**；可信快照可用，但不是即時資料 | A，D 協助匯入 | 取得新來源後清理、對齊六個 CSV，核對涵蓋期間與來源 checksum，建立候選資料庫並人工審核。全量原始查詢另需相容的 `manifest.json`／`files/`；乾淨 clone 不含這些封存。驗收見 [資料匯入流程](docs/SERVING.md#資料熱插拔資料庫版本與稽核)。 |
+| 發布前 | **團隊環境的部署與整合驗收尚未完成**；目前驗證為本機離線服務 | D＋C，A／B 提供版本資訊 | 在組員乾淨 checkout 重現下列驗收；資料或模型變更後重跑登入、候選審核、版本切換／回退、來源追溯及桌機／手機流程。若決定對外提供，再設定自訂帳密、allowed hosts、TLS、持久化備份與回退流程。公開部署目前未執行。 |
+
+### 組員先重現這一輪
+
+1. 從最新 `main` 建立自己的工作分支，依下方「快速開始」安裝依賴與建庫。已有資料版本的環境先備份，勿以重建 demo DB 覆寫現有工作區。
+2. 離線啟動後，網頁選擇「僅可信資料」＋「離線規則」。若要沿用本次展示埠，啟動命令為 `uv run --no-sync powerquery --serve --host 127.0.0.1 --port 8789`，網址為 <http://127.0.0.1:8789/>；先確認該埠未被其他服務占用。
+3. 跑下表，再跑「驗證與開發」的完整測試、Ruff 與離線評測；檢索／候選的針對性測試可用 `uv run --no-sync pytest tests/test_retriever.py tests/test_promotion_gate.py tests/test_corpus_learning.py tests/test_serving.py -q`。
+4. 若要改檢索，先核對 `src/text2sql/retriever.py`、`src/eval/promotion_gate.py` 與 `src/serving/corpus_learning.py`。檢索演算法或意圖規則改動若影響舊候選判定，須同步更新 `RETRIEVER_VERSION`，並驗證重新評測、冪等與人工拒絕不被重開。
+
+| 問句 | 展示快照預期答案 | 尚未人工處理的候選狀態 |
+|---|---|---|
+| `2026年7月林口三號機出力不是零的天數` | 26 天 | 待人工審核 |
+| `2026年7月林口三號機出力為零的天數` | 5 天 | 待人工審核 |
+| `2026年7月台中#2有發電幾天` | 31 天 | 待人工審核 |
+| `2026年7月台中#2沒有發電幾天` | 0 天 | 待人工審核 |
+| `2026年7月9日中火二號機尖峰出力多少` | 2026-07-09、28.4 萬瓩 | 待人工審核 |
+
+「有發電天數」在此只表示系統尖峰時刻觀測到正出力的天數，不能推論全天發電狀況。前四筆在新版的收錄前／後檢索評測皆為 131／140；若後續已審核或換資料，狀態與數值應以該環境紀錄為準。
+
+**執行期狀態不隨 Git 傳遞。** DB、`.powerquery-learning/`、`.powerquery-data/`、原始封存及 `logs/` 不在 Git 中；乾淨 clone 必須重建資料並重新送出問句，不會自動出現這台電腦的候選、審核或稽核紀錄。需交接既有執行期狀態時，另行備份並核對完整資料版本，不要把 DB、API key 或帳密加入 Git。`.env.example` 只是設定參考，程式不會自動載入 `.env`。
+
 ## 快速開始：本機離線展示
 
 需要 Python 3.11 以上與 [uv](https://docs.astral.sh/uv/)。在專案根目錄執行；第一次安裝依賴需要網路，之後的建庫與可信資料查詢使用 repo 內的 CSV，不下載資料、不呼叫模型。
@@ -46,7 +90,7 @@ uv run --no-sync powerquery --json "天然氣機組共有幾台？"
 | 能力 | 目前行為 |
 |---|---|
 | 資料工程 | CSV 驗證、機組名稱／容量對齊、長表轉換、SQLite 星狀模型與中文 `v_*` views |
-| 查詢 | 中文意圖／實體抽取、規則路由、TF-IDF 範例檢索；可選線上 LLM 與受限重試 |
+| 查詢 | 中文意圖／實體抽取、規則路由、意圖優先＋TF-IDF 範例檢索；可選線上 LLM 與受限重試 |
 | 安全守門 | SQL AST、唯讀與 view／欄位允許清單、筆數／逾時限制 |
 | 語意守門 | 針對指標、單位、時間、粒度與涵蓋範圍進行拒答、澄清或限制揭露 |
 | 呈現 | SQL、參數、執行 trace、摘要、統計、表格及受限 line／bar／scatter 圖表；CDN 不可用時用本機 SVG |
@@ -106,7 +150,7 @@ src/ingest/       下載、驗證、SQLite builder 與 schema
 src/align/        名稱、粒度、歲修與資料陷阱對齊
 src/text2sql/     router、entities、retriever、LLM、雙守門與 pipeline
 src/serving/      FastAPI、runtime、管理驗證、版本／語料治理與靜態前端
-src/eval/         離線評測
+src/eval/         離線評測、線上預檢與明確啟用的模型評測
 corpus/           核准檢索語料
 benchmarks/       獨立評測題組
 tests/            單元、契約、整合與端到端測試
@@ -127,4 +171,4 @@ configs/          路徑、檢索、模型與護欄設定
 - [啟動、管理與 API 使用方式](docs/SERVING.md)
 - [API 契約](src/serving/API_CONTRACT.md)
 - [完整設計規格](docs/superpowers/specs/2026-09-09-text2sql-taipower-design.md)（歷史設計；實際行為以程式與目前使用文件為準）
-- [AI Agent 協作與整合規範](docs/AI_AGENT_COLLABORATION.md)
+- [組員分工與 AI 協作規範](docs/TEAM_4_ROLES.md)

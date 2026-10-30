@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from serving.admin_auth import AdminAuthManager
+from serving.admin_auth import ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, AdminAuthManager
 from serving.app import create_app
 
 ORIGIN = "http://testserver"
@@ -267,6 +267,30 @@ def test_login_cookie_session_refresh_rotation_and_logout(client: TestClient) ->
     assert "max-age=0" in logout.headers["set-cookie"].lower()
     assert client.get("/api/admin/session").json()["data"]["authenticated"] is False
     assert client.get("/api/runtime/llm").status_code == 401
+
+
+def test_missing_admin_account_disables_management_with_setup_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(ADMIN_USERNAME_ENV, raising=False)
+    monkeypatch.delenv(ADMIN_PASSWORD_ENV, raising=False)
+    with TestClient(create_app(), base_url=ORIGIN) as test_client:
+        session = test_client.get("/api/admin/session")
+        login = test_client.post(
+            "/api/admin/session",
+            headers=_origin_headers(),
+            json={"username": USERNAME, "password": PASSWORD},
+        )
+        protected = test_client.get("/api/runtime/llm")
+
+    assert session.status_code == 200
+    assert session.json()["data"]["authenticated"] is False
+    assert login.status_code == 503
+    assert ".env" in login.json()["detail"]
+    assert ADMIN_PASSWORD_ENV in login.json()["detail"]
+    assert login.headers["cache-control"] == "no-store"
+    assert protected.status_code == 503
+    assert protected.json()["detail"] == login.json()["detail"]
 
 
 def test_login_failures_are_sanitized_and_rate_limited() -> None:

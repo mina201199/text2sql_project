@@ -93,7 +93,17 @@ Invoke-RestMethod http://127.0.0.1:8000/api/query -Method Post -ContentType "app
 
 ## 資料管理登入
 
-本機展示預設帳號為 `admin`，預設密碼為 `PowerQuery@123`。這組帳密是公開的 demo 預設，只允許 loopback 用戶端登入，不能視為正式部署的安全邊界。正式使用必須在啟動前同時覆寫：
+管理帳密沒有預設值，必須在啟動前設定 `POWERQUERY_ADMIN_USERNAME` 與 `POWERQUERY_ADMIN_PASSWORD`。兩者都未設定時，服務仍會啟動並提供公開查詢，但資料、語料與模型管理功能不會啟用：登入與管理 API 回傳 503，訊息會說明要在 `.env` 設定這兩個變數。
+
+服務本身不會自動讀取 `.env`。建議複製 [`.env.example`](../.env.example) 為 `.env`（已列入 `.gitignore`），取消註解並填入自己的帳號與長隨機密碼，再由 uv 載入：
+
+```powershell
+Copy-Item .env.example .env
+# 編輯 .env，填入 POWERQUERY_ADMIN_USERNAME 與 POWERQUERY_ADMIN_PASSWORD
+uv run --env-file .env powerquery --serve
+```
+
+也可以直接設定環境變數：
 
 ```powershell
 $env:POWERQUERY_ADMIN_USERNAME="你的管理帳號"
@@ -116,9 +126,10 @@ PowerShell 可用記憶體內的 `WebRequestSession` 呼叫管理 API，不必�
 $origin = "http://127.0.0.1:8000"
 $webSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
 $originHeaders = @{ Origin = $origin; "Sec-Fetch-Site" = "same-origin" }
+# 帳密取自目前 PowerShell 的環境變數，避免把密碼寫進腳本
 $loginBody = @{
-  username = "admin"
-  password = "PowerQuery@123"
+  username = $env:POWERQUERY_ADMIN_USERNAME
+  password = $env:POWERQUERY_ADMIN_PASSWORD
 } | ConvertTo-Json
 $loginParams = @{
   Uri = "$origin/api/admin/session"
@@ -223,5 +234,5 @@ API key 可在啟動前由 `OPENAI_API_KEY` 提供，模型可由 `OPENAI_MODEL`
 - `/docs` 以 nonce CSP、固定版號與 SRI 載入 Swagger UI；第一次使用互動檢視器需要連至 jsDelivr。主工作台內建文件不需要該 CDN。
 - 後端只允許受限的 `line`、`bar`、`scatter` 圖表；前端載入不到 Plotly 時退回原生 SVG。
 - 瀏覽器取消按鈕只停止等待與顯示，不中止已在後端執行的查詢。
-- 服務預設綁定 `127.0.0.1`。若要對外提供，必須覆寫預設帳密、限制 allowed hosts，並由可信任反向代理提供 TLS。記憶體內 OpenAI API key 不等於 API 身分驗證。
+- 服務預設綁定 `127.0.0.1`。若要對外提供，必須設定足夠強度的管理帳密、限制 allowed hosts，並由可信任反向代理提供 TLS。記憶體內 OpenAI API key 不等於 API 身分驗證。
 - 公開 hosting／tunnel 為另外選擇的部署操作；本文快速開始與一鍵啟動均不會建立公開網址。

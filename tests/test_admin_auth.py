@@ -12,11 +12,10 @@ from serving.admin_auth import (
     ADMIN_PASSWORD_ENV,
     ADMIN_USERNAME_ENV,
     ALLOWED_HOSTS_ENV,
-    DEFAULT_ADMIN_PASSWORD,
-    DEFAULT_ADMIN_USERNAME,
     SESSION_TTL_ENV,
     AdminAuthConfigurationError,
     AdminAuthManager,
+    AdminAuthNotConfigured,
     CsrfValidationFailed,
     DefaultCredentialsRemoteAccessDenied,
     DefaultCredentialsWarning,
@@ -93,13 +92,13 @@ def _request(
     )
 
 
-def test_environment_defaults_warn_and_override_is_all_or_nothing() -> None:
-    with pytest.warns(DefaultCredentialsWarning):
-        default = AdminAuthManager.from_environment({}, pbkdf2_iterations=1_000)
-    assert default.username == DEFAULT_ADMIN_USERNAME
-    assert default.using_default_credentials is True
-    grant = default.login(DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD)
-    assert grant.principal.using_default_credentials is True
+def test_environment_account_is_required_and_all_or_nothing() -> None:
+    with pytest.raises(AdminAuthNotConfigured) as missing:
+        AdminAuthManager.from_environment({}, pbkdf2_iterations=1_000)
+    message = str(missing.value)
+    assert ".env" in message
+    assert ADMIN_USERNAME_ENV in message
+    assert ADMIN_PASSWORD_ENV in message
 
     environment = {
         ADMIN_USERNAME_ENV: "operator",
@@ -327,7 +326,7 @@ def test_request_authentication_requires_exact_origin_and_session_csrf() -> None
 
 def test_default_credentials_are_rejected_for_non_loopback_clients() -> None:
     with pytest.warns(DefaultCredentialsWarning):
-        manager = AdminAuthManager.from_environment({}, pbkdf2_iterations=1_000)
+        manager = _manager(using_default_credentials=True)
 
     manager.validate_login_request(_request())
     with pytest.raises(DefaultCredentialsRemoteAccessDenied):

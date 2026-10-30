@@ -25,8 +25,6 @@ from urllib.parse import urlsplit
 
 from fastapi import Request, Response
 
-DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_PASSWORD = "PowerQuery@123"
 DEFAULT_SESSION_TTL_SECONDS = 15 * 60
 MINIMUM_SESSION_TTL_SECONDS = 5 * 60
 MAXIMUM_SESSION_TTL_SECONDS = 60 * 60
@@ -51,6 +49,18 @@ class AdminAuthError(Exception):
 
 class AdminAuthConfigurationError(AdminAuthError):
     """The authentication environment is incomplete or unsafe."""
+
+
+class AdminAuthNotConfigured(AdminAuthConfigurationError):
+    """No administrator account is configured, so management stays disabled."""
+
+    def __init__(self) -> None:
+        # 服務不會自動讀取 .env，因此訊息同時說明如何用 uv 載入，避免設定了卻沒有生效
+        super().__init__(
+            f"管理功能未啟用：請在 .env 設定 {ADMIN_USERNAME_ENV} 與 {ADMIN_PASSWORD_ENV}"
+            "（範例見 .env.example），並以 uv run --env-file .env powerquery --serve 啟動；"
+            "也可以直接把這兩個值設為環境變數。"
+        )
 
 
 class InvalidCredentials(AdminAuthError):
@@ -226,20 +236,21 @@ class AdminAuthManager:
         environ: Mapping[str, str] | None = None,
         **kwargs: object,
     ) -> AdminAuthManager:
-        """Build a manager from an all-or-nothing account environment override."""
+        """Build a manager from the required, all-or-nothing account environment."""
 
         source = os.environ if environ is None else environ
         has_username = ADMIN_USERNAME_ENV in source
         has_password = ADMIN_PASSWORD_ENV in source
+        if not has_username and not has_password:
+            raise AdminAuthNotConfigured()
         if has_username != has_password:
             raise AdminAuthConfigurationError(
                 f"{ADMIN_USERNAME_ENV} 與 {ADMIN_PASSWORD_ENV} 必須同時設定。"
             )
 
-        using_defaults = not has_username
-        username = source[ADMIN_USERNAME_ENV] if has_username else DEFAULT_ADMIN_USERNAME
-        password = source[ADMIN_PASSWORD_ENV] if has_password else DEFAULT_ADMIN_PASSWORD
-        if has_username and (not username.strip() or not password):
+        username = source[ADMIN_USERNAME_ENV]
+        password = source[ADMIN_PASSWORD_ENV]
+        if not username.strip() or not password:
             raise AdminAuthConfigurationError("管理員帳號與密碼不可為空。")
 
         raw_ttl = source.get(SESSION_TTL_ENV)
@@ -259,7 +270,7 @@ class AdminAuthManager:
         return cls(
             username=username,
             password=password,
-            using_default_credentials=using_defaults,
+            using_default_credentials=False,
             **kwargs,
         )
 

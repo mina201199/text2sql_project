@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import Mapping
 from contextlib import suppress
@@ -21,8 +22,10 @@ from pydantic import BaseModel, ConfigDict, SecretStr, StringConstraints
 from ingest.build_db import build_database
 from ingest.validate import PROJECT_ROOT, resolve_configured_paths
 from serving.admin_auth import (
+    DEFAULT_SESSION_TTL_SECONDS,
     AdminAuthError,
     AdminAuthManager,
+    AdminAuthNotConfigured,
     AdminPrincipal,
     InvalidAdminSession,
     InvalidCredentials,
@@ -43,6 +46,7 @@ from serving.query_log import QueryErrorLog
 from serving.raw_data import RawDataError, RawDataNotFoundError, RawDataService
 from serving.runtime import RuntimeManager, RuntimeMode, ServiceRuntime
 
+LOGGER = logging.getLogger(__name__)
 SAFE_RUNTIME_ERRORS = {
     "線上模式尚未設定 API key。",
     "線上模式需要 API key；請在記憶體設定或使用 OPENAI_API_KEY。",
@@ -92,16 +96,29 @@ def _data_http_error(error: DataManagementError) -> HTTPException:
     return HTTPException(status_code=status_code, detail=str(error))
 
 
+def _active_auth_manager(request: Request) -> AdminAuthManager:
+    manager = request.app.state.auth_manager
+    if manager is None:
+        raise HTTPException(
+            status_code=503,
+            detail=request.app.state.admin_unavailable_reason,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        )
+    return manager
+
+
 def _require_admin(request: Request) -> AdminPrincipal:
+    manager = _active_auth_manager(request)
     try:
-        return request.app.state.auth_manager.authenticate_request(request)
+        return manager.authenticate_request(request)
     except AdminAuthError as error:
         raise _auth_http_error(error) from error
 
 
 def _require_admin_mutation(request: Request) -> AdminPrincipal:
+    manager = _active_auth_manager(request)
     try:
-        return request.app.state.auth_manager.authenticate_request(
+        return manager.authenticate_request(
             request,
             require_csrf=True,
         )
@@ -225,7 +242,14 @@ def create_app(
         redoc_url=None,
     )
     application.state.runtime_manager = RuntimeManager(runtime) if runtime is not None else None
-    application.state.auth_manager = auth_manager or AdminAuthManager.from_environment()
+    if auth_manager is None:
+        try:
+            auth_manager = AdminAuthManager.from_environment()
+        except AdminAuthNotConfigured as error:
+            # 沒有管理帳密時只停用管理功能，公開查詢照常提供，不讓整個服務因此無法啟動
+            application.state.admin_unavailable_reason = str(error)
+            LOGGER.warning("%s", error)
+    application.state.auth_manager = auth_manager
     application.state.data_manager = data_manager
     application.state.data_base_directory = (
         runtime.database.parent
@@ -488,7 +512,7 @@ def create_app(
             or protected_path.startswith("/api/data/")
             or protected_path == "/api/training-status"
         ):
-            application.state.auth_manager.mark_no_store(response)
+            AdminAuthManager.mark_no_store(response)
         return response
 
     @application.get("/", include_in_schema=False)
@@ -535,6 +559,12 @@ def create_app(
         return HTMLResponse(body, headers={"Content-Security-Policy": docs_csp})
 
     def anonymous_admin_status() -> dict[str, object]:
+        if application.state.auth_manager is None:
+            return {
+                "authenticated": False,
+                "using_default_credentials": False,
+                "session_ttl_seconds": DEFAULT_SESSION_TTL_SECONDS,
+            }
         policy = application.state.auth_manager.public_configuration()
         return {
             "authenticated": False,
@@ -548,7 +578,7 @@ def create_app(
         request: Request,
         response: Response,
     ) -> dict[str, object]:
-        manager: AdminAuthManager = application.state.auth_manager
+        manager = _active_auth_manager(request)
         try:
             manager.validate_login_request(request)
             client_id = request.client.host if request.client is not None else None
@@ -575,7 +605,9 @@ def create_app(
 
     @application.get("/api/admin/session")
     def admin_session_status(request: Request, response: Response) -> dict[str, object]:
-        manager: AdminAuthManager = application.state.auth_manager
+        manager: AdminAuthManager | None = application.state.auth_manager
+        if manager is None:
+            return {"success": True, "data": anonymous_admin_status()}
         token = request.cookies.get(manager.cookie_name)
         if not token:
             return {"success": True, "data": anonymous_admin_status()}

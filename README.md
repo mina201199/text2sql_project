@@ -92,7 +92,7 @@ flowchart LR
     D[CSV 驗證與對齊] --> DB
 ```
 
-網頁包含查詢中心、資料總覽、資料管理、API 與模型、API 文件五個工作區。公開查詢不需登入；資料、語料及模型管理需管理 session，寫入另需同源與 CSRF 驗證。本機預設 `admin`／`PowerQuery@123` 僅用於 loopback demo；自訂帳密與操作方式見 [管理登入](docs/SERVING.md#資料管理登入)。
+網頁包含查詢中心、資料總覽、資料管理、API 與模型、API 文件五個工作區。公開查詢不需登入；資料、語料及模型管理需管理 session，寫入另需同源與 CSRF 驗證。管理帳密沒有預設值：請在 `.env` 設定 `POWERQUERY_ADMIN_USERNAME` 與 `POWERQUERY_ADMIN_PASSWORD`（範例見 [`.env.example`](.env.example)），並以 `uv run --env-file .env powerquery --serve` 啟動；未設定時公開查詢照常可用，但管理功能不會啟用。操作方式見 [管理登入](docs/SERVING.md#資料管理登入)。
 
 ## 資料快照與涵蓋範圍
 

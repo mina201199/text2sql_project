@@ -8,10 +8,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from serving import raw_data as raw_data_module
+from serving.admin_auth import ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV
 from serving.app import create_app
 from serving.raw_data import RawDataError, RawDataService
 
 ORIGIN = "http://testserver"
+
+
+@pytest.fixture(autouse=True)
+def _test_admin_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    # create_app 會從環境變數讀取管理帳密；注入測試專用帳密，讓結果不受本機環境影響
+    monkeypatch.setenv(ADMIN_USERNAME_ENV, "raw-data-test-admin")
+    monkeypatch.setenv(ADMIN_PASSWORD_ENV, "raw data test-only password")
 
 
 def _snapshot(tmp_path: Path) -> Path:

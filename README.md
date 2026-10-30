@@ -2,6 +2,31 @@
 
 用中文查詢台電資料，並在回答前確認 SQL 安全性與資料是否足以支持答案。
 
+## Fork 與個人貢獻
+
+本 repo fork 自團隊專案 [lee851104/text2sql_project](https://github.com/lee851104/text2sql_project)，基準為 upstream 2026-09-14 的 `9a8ecad`，之後 upstream 的更新沒有同步到這裡。資料對齊層、SQLite 語意層、Text2SQL 管線、SQL／語意守門、離線評測、FastAPI、前端與資料／語料治理等主體由團隊完成；以下只列出我（[mina201199](https://github.com/mina201199)）負責的部分。
+
+**已合併到 upstream 的 PR**
+
+| PR | 內容 | 主要檔案 |
+|---|---|---|
+| [lee851104/text2sql_project#2](https://github.com/lee851104/text2sql_project/pull/2) | 用 repo 指定的 Ruff 版本修正格式與 import 排序，讓 CI 能執行到 lint 與測試；不改變行為 | `src/serving/raw_data.py`、`src/serving/app.py`、`src/text2sql/semantic_guard.py` 等 8 個檔案 |
+| [lee851104/text2sql_project#15](https://github.com/lee851104/text2sql_project/pull/15) | 把檢索語料範例中寫死的字串值改成綁定參數，讓範例能通過 `SqlGuard`；新增「每個語料範例都要通過 guard 並可執行」的測試；修正離線回答誤判日期超出範圍、系統指標排行只回 1 筆、裝置容量問法被誤分類 | `corpus/training_corpus.json`、`src/text2sql/router.py`、`src/text2sql/semantic_guard.py`、`src/text2sql/pipeline.py`、`tests/test_corpus_examples.py` |
+
+**本 fork 的工作**（2026-10-21，fork 內 PR [#1](https://github.com/mina201199/text2sql_project/pull/1)～[#4](https://github.com/mina201199/text2sql_project/pull/4)）
+
+| 項目 | 內容 | 主要檔案 |
+|---|---|---|
+| 線上評測 CLI（opt-in） | 預設只做本機預檢；必須明確指定 `--online` 與 `--model` 才會呼叫模型，並限制題數、呼叫次數、重試次數與逾時；不讀取 `.env`，也不把金鑰寫進報告 | `src/eval/run_online_eval.py`、`tests/test_online_eval.py`、`docs/ONLINE_EVALUATION.md` |
+| 離線問法擴充 | 補強數字月份、機組別名、排行、正／零出力天數等規則問法，以及明確期間的總發電量拒答，並以離線問法案例集驗證 | `tests/fixtures/offline_language_cases.json`、`tests/test_offline_language.py`、`tests/test_query_paraphrases.py`、`src/text2sql/aliases.py`、`src/text2sql/router.py`、`src/text2sql/entities.py`、`src/text2sql/semantic_guard.py`、`docs/offline-language-pack.md`、`docs/query-quality.md` |
+| 語料檢索 | 檢索時優先考慮問題意圖、重新驗證舊版被拒的語料候選，並在檢索退步而拒絕候選時說明原因 | `src/text2sql/retriever.py`、`src/serving/corpus_learning.py`、`tests/test_retriever.py`、`tests/test_corpus_learning.py` |
+| 展示與文件 | 修正未登入時的模式標籤與完整資料期間顯示；整理啟動與資料匯入說明、Phase 9 交付紀錄 | `src/serving/static/app.js`、`docs/SERVING.md`、`docs/PHASE9_STATUS.md` |
+
+**評測結果的來源**
+
+- `reports/eval_latest.json` 的離線評測結果由團隊於 2026-09-13 在 upstream 產生（commit `f8a9d01`），不是我的工作成果。
+- 線上 LLM 評測目前只用 fake client 驗證流程並完成無 key 預檢，**尚未以真實模型執行**，因此沒有線上模型準確率，詳見 [Phase 9 交付紀錄](docs/PHASE9_STATUS.md)。
+
 目前已實作至 **Phase 9**：SQLite 語意層、離線規則路由、可選 OpenAI adapter、SQL／語意雙守門、離線評測、FastAPI、圖表工作台，以及需登入與人工審核的資料／語料管理。離線模式不需要 API key；它使用確定性規則，未涵蓋的問法會拒答，不是本機生成式模型。
 
 ## 快速開始：本機離線展示
@@ -127,4 +152,4 @@ configs/          路徑、檢索、模型與護欄設定
 - [啟動、管理與 API 使用方式](docs/SERVING.md)
 - [API 契約](src/serving/API_CONTRACT.md)
 - [完整設計規格](docs/superpowers/specs/2026-09-09-text2sql-taipower-design.md)（歷史設計；實際行為以程式與目前使用文件為準）
-- [AI Agent 協作與整合規範](docs/AI_AGENT_COLLABORATION.md)
+- [四人分工與 AI Agent 協作規範](docs/TEAM_4_ROLES.md)
